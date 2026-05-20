@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 
 class LoansScreen extends StatefulWidget {
   const LoansScreen({super.key});
@@ -75,6 +76,14 @@ class _LoansScreenState extends State<LoansScreen> {
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
   }
 
+  String loanReminderText(ReminderProvider reminder) {
+    if (!reminder.loanRemindersEnabled) {
+      return 'Loan reminders are currently disabled in Reminder Settings.';
+    }
+
+    return 'Loan reminder will show ${reminder.remindBeforeDays} days before this due date using ${reminder.reminderChannel}.';
+  }
+
   Future<void> pickLoanDate({
     required DateTime selectedDate,
     required ValueChanged<DateTime> onPicked,
@@ -84,7 +93,7 @@ class _LoansScreenState extends State<LoansScreen> {
       initialDate: selectedDate,
       firstDate: DateTime(DateTime.now().year - 10),
       lastDate: DateTime(DateTime.now().year + 10),
-      helpText: 'Select loan date',
+      helpText: 'Select loan due date',
     );
 
     if (pickedDate == null) return;
@@ -142,6 +151,8 @@ class _LoansScreenState extends State<LoansScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final reminder = context.watch<ReminderProvider>();
+
             return Container(
               padding: EdgeInsets.only(
                 left: 20,
@@ -174,8 +185,8 @@ class _LoansScreenState extends State<LoansScreen> {
                         const SizedBox(height: 6),
                         Text(
                           isEdit
-                              ? 'Update loan details and payment status.'
-                              : 'Track loans taken or given with status and purpose.',
+                              ? 'Update loan details, due date, and payment status.'
+                              : 'Track loans taken or given with due date reminders.',
                           style: TextStyle(color: Colors.grey.shade600),
                         ),
                         const SizedBox(height: 20),
@@ -238,7 +249,12 @@ class _LoansScreenState extends State<LoansScreen> {
                           ],
                         ),
                         const SizedBox(height: 14),
+                        _ReminderHintCard(
+                          text: loanReminderText(reminder),
+                        ),
+                        const SizedBox(height: 14),
                         _DatePickerField(
+                          title: 'Due Date / Reminder Date',
                           readableDate: readableDate(selectedDate),
                           savedDate: formatDate(selectedDate),
                           onTap: () {
@@ -836,7 +852,7 @@ class _LoanTextInfo extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${item.loanType} • ${item.loanPurpose} • $readableDate',
+          '${item.loanType} • ${item.loanPurpose} • Due: $readableDate',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -849,13 +865,56 @@ class _LoanTextInfo extends StatelessWidget {
   }
 }
 
+class _ReminderHintCard extends StatelessWidget {
+  const _ReminderHintCard({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.notifications_active_outlined,
+            color: Color(0xFFF59E0B),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF92400E),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DatePickerField extends StatelessWidget {
   const _DatePickerField({
+    required this.title,
     required this.readableDate,
     required this.savedDate,
     required this.onTap,
   });
 
+  final String title;
   final String readableDate;
   final String savedDate;
   final VoidCallback onTap;
@@ -883,7 +942,7 @@ class _DatePickerField extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      readableDate,
+                      '$title: $readableDate',
                       style: const TextStyle(
                         color: Color(0xFF0F172A),
                         fontWeight: FontWeight.w900,
@@ -891,7 +950,7 @@ class _DatePickerField extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Saved as $savedDate for reports',
+                      'Saved as $savedDate for reports and reminders',
                       style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 12,

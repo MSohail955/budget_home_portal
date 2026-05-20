@@ -6,6 +6,7 @@ import '../../../core/providers/dashboard_filter_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/providers/profile_provider.dart';
 import '../../../core/providers/reminder_provider.dart';
+import '../../../core/utils/reminder_alert_utils.dart';
 import '../../../core/utils/report_filter_utils.dart';
 import '../../records/presentation/records_screen.dart';
 
@@ -136,6 +137,11 @@ class DashboardScreen extends StatelessWidget {
     final filter = context.watch<DashboardFilterProvider>();
     final reminder = context.watch<ReminderProvider>();
 
+    final upcomingAlerts = ReminderAlertUtils.buildUpcomingAlerts(
+      finance: finance,
+      reminder: reminder,
+    );
+
     final snapshot = buildSnapshot(
       finance: finance,
       selectedMonth: filter.selectedMonth,
@@ -232,7 +238,6 @@ class DashboardScreen extends StatelessWidget {
                               child: _AlertsCard(
                                 currency: currency,
                                 snapshot: snapshot,
-                                reminder: reminder,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -251,7 +256,6 @@ class DashboardScreen extends StatelessWidget {
                           _AlertsCard(
                             currency: currency,
                             snapshot: snapshot,
-                            reminder: reminder,
                           ),
                           const SizedBox(height: 16),
                           _RecentActivityCard(
@@ -262,6 +266,13 @@ class DashboardScreen extends StatelessWidget {
                       );
                     },
                   ),
+                  const SizedBox(height: 22),
+                  _UpcomingRemindersCard(
+                    reminder: reminder,
+                    upcomingAlerts: upcomingAlerts,
+                  ),
+                  const SizedBox(height: 22),
+                  _ReminderRulesCard(reminder: reminder),
                   const SizedBox(height: 22),
                   _PerformanceSection(snapshot: snapshot),
                   const SizedBox(height: 100),
@@ -885,12 +896,10 @@ class _AlertsCard extends StatelessWidget {
   const _AlertsCard({
     required this.currency,
     required this.snapshot,
-    required this.reminder,
   });
 
   final CurrencyProvider currency;
   final DashboardSnapshot snapshot;
-  final ReminderProvider reminder;
 
   @override
   Widget build(BuildContext context) {
@@ -931,8 +940,57 @@ class _AlertsCard extends StatelessWidget {
             color: const Color(0xFF7C3AED),
           ),
         ],
-        const SizedBox(height: 6),
-        const _AlertSectionTitle(title: 'Reminder Rules'),
+      ],
+    );
+  }
+}
+
+class _UpcomingRemindersCard extends StatelessWidget {
+  const _UpcomingRemindersCard({
+    required this.reminder,
+    required this.upcomingAlerts,
+  });
+
+  final ReminderProvider reminder;
+  final List<ReminderAlert> upcomingAlerts;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelCard(
+      title: 'Upcoming Reminders',
+      icon: Icons.event_available_outlined,
+      children: [
+        if (upcomingAlerts.isEmpty)
+          const _EmptyMiniState(
+            icon: Icons.notifications_none_outlined,
+            title: 'No upcoming reminders',
+            subtitle:
+                'Upcoming bills, rent, and loan reminders will appear here based on your reminder settings.',
+          )
+        else
+          ...upcomingAlerts.map(
+            (alert) => _UpcomingReminderRow(alert: alert),
+          ),
+        const SizedBox(height: 4),
+        _ReminderChannelNote(reminder: reminder),
+      ],
+    );
+  }
+}
+
+class _ReminderRulesCard extends StatelessWidget {
+  const _ReminderRulesCard({
+    required this.reminder,
+  });
+
+  final ReminderProvider reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelCard(
+      title: 'Reminder Rules',
+      icon: Icons.rule_folder_outlined,
+      children: [
         if (reminder.billRemindersEnabled) ...[
           _ReminderRuleRow(
             icon: Icons.wifi_outlined,
@@ -972,37 +1030,143 @@ class _AlertsCard extends StatelessWidget {
                 'Reminder ${reminder.remindBeforeDays} days before selected loan date',
             color: const Color(0xFFEF4444),
           ),
-        _ReminderRuleRow(
-          icon: Icons.notifications_none_outlined,
-          title: 'Reminder Channel',
-          subtitle:
-              '${reminder.reminderChannel} selected. Email/SMS needs backend integration.',
-          color: const Color(0xFF0F172A),
-        ),
       ],
     );
   }
 }
 
-class _AlertSectionTitle extends StatelessWidget {
-  const _AlertSectionTitle({
-    required this.title,
+class _ReminderChannelNote extends StatelessWidget {
+  const _ReminderChannelNote({
+    required this.reminder,
   });
 
-  final String title;
+  final ReminderProvider reminder;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      alignment: Alignment.centerLeft,
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color: Color(0xFF2563EB),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Reminder channel: ${reminder.reminderChannel}. Email/SMS will require backend integration.',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UpcomingReminderRow extends StatelessWidget {
+  const _UpcomingReminderRow({
+    required this.alert,
+  });
+
+  final ReminderAlert alert;
+
+  Color get color {
+    if (alert.type == 'Bill') return const Color(0xFF2563EB);
+    if (alert.type == 'Rent') return const Color(0xFF7C3AED);
+    if (alert.type == 'Loan') return const Color(0xFFF59E0B);
+
+    return const Color(0xFF0F172A);
+  }
+
+  IconData get icon {
+    if (alert.type == 'Bill') return Icons.receipt_long_outlined;
+    if (alert.type == 'Rent') return Icons.home_work_outlined;
+    if (alert.type == 'Loan') return Icons.handshake_outlined;
+
+    return Icons.notifications_active_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = alert.daysLeft == 0 ? 'Today' : '${alert.daysLeft}d left';
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF0F172A),
-          fontWeight: FontWeight.w900,
-          fontSize: 14,
-        ),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.14)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  alert.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  alert.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              badge,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1364,6 +1528,7 @@ class _EmptyMiniState extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(18),

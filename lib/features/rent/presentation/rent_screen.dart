@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 
 class RentScreen extends StatefulWidget {
   const RentScreen({super.key});
@@ -86,6 +87,43 @@ class _RentScreenState extends State<RentScreen> {
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
   }
 
+  int monthIndexFromName(String month) {
+    final index = months.indexOf(month);
+
+    if (index == -1) return DateTime.now().month;
+
+    return index + 1;
+  }
+
+  int clampDayForMonth(int year, int month, int day) {
+    final lastDay = DateTime(year, month + 1, 0).day;
+
+    if (day < 1) return 1;
+    if (day > lastDay) return lastDay;
+
+    return day;
+  }
+
+  DateTime buildRentDueDate({
+    required String month,
+    required String year,
+    required ReminderProvider reminder,
+  }) {
+    final parsedYear = int.tryParse(year) ?? DateTime.now().year;
+    final parsedMonth = monthIndexFromName(month);
+    final safeDay = clampDayForMonth(
+      parsedYear,
+      parsedMonth,
+      reminder.rentReminderStartDay,
+    );
+
+    return DateTime(parsedYear, parsedMonth, safeDay);
+  }
+
+  String rentReminderText(ReminderProvider reminder) {
+    return 'Rent reminder window: day ${reminder.rentReminderStartDay} to ${reminder.rentReminderEndDay} every month.';
+  }
+
   Future<void> pickDate({
     required DateTime selectedDate,
     required String helpText,
@@ -105,6 +143,7 @@ class _RentScreenState extends State<RentScreen> {
   }
 
   void openRentSheet({RentRecord? existingRent}) {
+    final reminder = context.read<ReminderProvider>();
     final isEdit = existingRent != null;
 
     final propertyController = TextEditingController(
@@ -123,23 +162,33 @@ class _RentScreenState extends State<RentScreen> {
       text: existingRent?.notes ?? '',
     );
 
-    DateTime selectedDueDate = parseSavedDate(existingRent?.dueDate ?? '');
+    final now = DateTime.now();
+
+    String selectedMonth = existingRent?.month ?? months[now.month - 1];
+    String selectedYear = existingRent?.year ?? now.year.toString();
+
+    if (!months.contains(selectedMonth)) {
+      selectedMonth = months[now.month - 1];
+    }
+
+    if (!years.contains(selectedYear)) {
+      selectedYear = now.year.toString();
+    }
+
+    DateTime selectedDueDate = existingRent == null
+        ? buildRentDueDate(
+            month: selectedMonth,
+            year: selectedYear,
+            reminder: reminder,
+          )
+        : parseSavedDate(existingRent.dueDate);
+
     DateTime? selectedPaymentDate =
         existingRent?.paymentDate.trim().isEmpty ?? true
             ? null
             : parseSavedDate(existingRent?.paymentDate ?? '');
 
-    String selectedMonth = existingRent?.month ?? months[selectedDueDate.month - 1];
-    String selectedYear = existingRent?.year ?? selectedDueDate.year.toString();
     bool isPaid = existingRent?.isPaid ?? false;
-
-    if (!months.contains(selectedMonth)) {
-      selectedMonth = months[selectedDueDate.month - 1];
-    }
-
-    if (!years.contains(selectedYear)) {
-      selectedYear = DateTime.now().year.toString();
-    }
 
     showModalBottomSheet(
       context: context,
@@ -148,6 +197,8 @@ class _RentScreenState extends State<RentScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final liveReminder = context.watch<ReminderProvider>();
+
             return Container(
               padding: EdgeInsets.only(
                 left: 20,
@@ -220,8 +271,15 @@ class _RentScreenState extends State<RentScreen> {
                                   );
                                 }).toList(),
                                 onChanged: (value) {
+                                  if (value == null) return;
+
                                   setSheetState(() {
-                                    selectedMonth = value ?? selectedMonth;
+                                    selectedMonth = value;
+                                    selectedDueDate = buildRentDueDate(
+                                      month: selectedMonth,
+                                      year: selectedYear,
+                                      reminder: liveReminder,
+                                    );
                                   });
                                 },
                               ),
@@ -241,13 +299,24 @@ class _RentScreenState extends State<RentScreen> {
                                   );
                                 }).toList(),
                                 onChanged: (value) {
+                                  if (value == null) return;
+
                                   setSheetState(() {
-                                    selectedYear = value ?? selectedYear;
+                                    selectedYear = value;
+                                    selectedDueDate = buildRentDueDate(
+                                      month: selectedMonth,
+                                      year: selectedYear,
+                                      reminder: liveReminder,
+                                    );
                                   });
                                 },
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 14),
+                        _ReminderHintCard(
+                          text: rentReminderText(liveReminder),
                         ),
                         const SizedBox(height: 14),
                         _DatePickerField(
@@ -871,6 +940,47 @@ class _RentTextInfo extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReminderHintCard extends StatelessWidget {
+  const _ReminderHintCard({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDDD6FE)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.notifications_active_outlined,
+            color: Color(0xFF7C3AED),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF4C1D95),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

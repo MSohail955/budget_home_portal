@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 
 class BillsScreen extends StatefulWidget {
   const BillsScreen({super.key});
@@ -73,6 +74,76 @@ class _BillsScreenState extends State<BillsScreen> {
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
   }
 
+  DateTime buildDueDateForCurrentMonth(int day) {
+    final now = DateTime.now();
+    final safeDay = clampDayForMonth(now.year, now.month, day);
+
+    return DateTime(now.year, now.month, safeDay);
+  }
+
+  int clampDayForMonth(int year, int month, int day) {
+    final lastDay = DateTime(year, month + 1, 0).day;
+
+    if (day < 1) return 1;
+    if (day > lastDay) return lastDay;
+
+    return day;
+  }
+
+  DateTime autoDueDateByCategory({
+    required String category,
+    required ReminderProvider reminder,
+    required DateTime currentDate,
+  }) {
+    final year = currentDate.year;
+    final month = currentDate.month;
+
+    if (category == 'Internet') {
+      return DateTime(
+        year,
+        month,
+        clampDayForMonth(year, month, reminder.internetBillDay),
+      );
+    }
+
+    if (category == 'School Fees') {
+      return DateTime(
+        year,
+        month,
+        clampDayForMonth(year, month, reminder.schoolFeesDay),
+      );
+    }
+
+    if (category == 'Electricity') {
+      return DateTime(
+        year,
+        month,
+        clampDayForMonth(year, month, reminder.electricityBillDay),
+      );
+    }
+
+    return currentDate;
+  }
+
+  String reminderHintForCategory({
+    required String category,
+    required ReminderProvider reminder,
+  }) {
+    if (category == 'Internet') {
+      return 'Auto due date from Reminder Settings: day ${reminder.internetBillDay}';
+    }
+
+    if (category == 'School Fees') {
+      return 'Auto due date from Reminder Settings: day ${reminder.schoolFeesDay}';
+    }
+
+    if (category == 'Electricity') {
+      return 'Auto due date from Reminder Settings: day ${reminder.electricityBillDay}';
+    }
+
+    return 'Select due date manually for this bill category';
+  }
+
   Future<void> pickBillDate({
     required DateTime selectedDate,
     required ValueChanged<DateTime> onPicked,
@@ -91,6 +162,7 @@ class _BillsScreenState extends State<BillsScreen> {
   }
 
   void openBillSheet({BillRecord? existingBill}) {
+    final reminder = context.read<ReminderProvider>();
     final isEdit = existingBill != null;
 
     final titleController = TextEditingController(
@@ -103,7 +175,13 @@ class _BillsScreenState extends State<BillsScreen> {
 
     String selectedCategory = existingBill?.category ?? 'Electricity';
     bool isPaid = existingBill?.isPaid ?? false;
-    DateTime selectedDueDate = parseSavedDate(existingBill?.dueDate ?? '');
+    DateTime selectedDueDate = existingBill == null
+        ? autoDueDateByCategory(
+            category: selectedCategory,
+            reminder: reminder,
+            currentDate: DateTime.now(),
+          )
+        : parseSavedDate(existingBill.dueDate);
 
     final categories = const [
       'Electricity',
@@ -127,6 +205,8 @@ class _BillsScreenState extends State<BillsScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final liveReminder = context.watch<ReminderProvider>();
+
             return Container(
               padding: EdgeInsets.only(
                 left: 20,
@@ -177,6 +257,39 @@ class _BillsScreenState extends State<BillsScreen> {
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          value: selectedCategory,
+                          decoration: _inputDecoration(
+                            'Category',
+                            Icons.category_outlined,
+                          ),
+                          items: categories.map((item) {
+                            return DropdownMenuItem(
+                              value: item,
+                              child: Text(item),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+
+                            setSheetState(() {
+                              selectedCategory = value;
+                              selectedDueDate = autoDueDateByCategory(
+                                category: selectedCategory,
+                                reminder: liveReminder,
+                                currentDate: selectedDueDate,
+                              );
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        _ReminderHintCard(
+                          text: reminderHintForCategory(
+                            category: selectedCategory,
+                            reminder: liveReminder,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
                         _DatePickerField(
                           title: 'Due Date',
                           readableDate: readableDate(selectedDueDate),
@@ -191,25 +304,6 @@ class _BillsScreenState extends State<BillsScreen> {
                                 });
                               },
                             );
-                          },
-                        ),
-                        const SizedBox(height: 14),
-                        DropdownButtonFormField<String>(
-                          value: selectedCategory,
-                          decoration: _inputDecoration(
-                            'Category',
-                            Icons.category_outlined,
-                          ),
-                          items: categories.map((item) {
-                            return DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setSheetState(() {
-                              selectedCategory = value ?? 'Electricity';
-                            });
                           },
                         ),
                         const SizedBox(height: 14),
@@ -794,6 +888,47 @@ class _BillTextInfo extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReminderHintCard extends StatelessWidget {
+  const _ReminderHintCard({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.notifications_active_outlined,
+            color: Color(0xFF2563EB),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

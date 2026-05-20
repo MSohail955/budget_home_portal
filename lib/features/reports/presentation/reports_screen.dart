@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 import '../../../core/providers/report_filter_provider.dart';
+import '../../../core/utils/reminder_alert_utils.dart';
 import '../../../core/utils/report_filter_utils.dart';
 import '../../../core/utils/web_print_helper.dart';
 
@@ -121,11 +123,17 @@ class ReportsScreen extends StatelessWidget {
     final currency = context.watch<CurrencyProvider>();
     final finance = context.watch<FinanceProvider>();
     final filter = context.watch<ReportFilterProvider>();
+    final reminder = context.watch<ReminderProvider>();
 
     final snapshot = buildSnapshot(
       finance: finance,
       selectedMonth: filter.selectedMonth,
       selectedYear: filter.selectedYear,
+    );
+
+    final reminderAlerts = ReminderAlertUtils.buildUpcomingAlerts(
+      finance: finance,
+      reminder: reminder,
     );
 
     final hasAnyRecords = snapshot.totalRecords > 0;
@@ -199,6 +207,11 @@ class ReportsScreen extends StatelessWidget {
                         ],
                       );
                     },
+                  ),
+                  const SizedBox(height: 22),
+                  _ReminderReportCard(
+                    reminder: reminder,
+                    reminderAlerts: reminderAlerts,
                   ),
                   const SizedBox(height: 22),
                   LayoutBuilder(
@@ -818,6 +831,299 @@ class _ReportSummaryCard extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderReportCard extends StatelessWidget {
+  const _ReminderReportCard({
+    required this.reminder,
+    required this.reminderAlerts,
+  });
+
+  final ReminderProvider reminder;
+  final List<ReminderAlert> reminderAlerts;
+
+  int get billCount =>
+      reminderAlerts.where((item) => item.type == 'Bill').length;
+
+  int get rentCount =>
+      reminderAlerts.where((item) => item.type == 'Rent').length;
+
+  int get loanCount =>
+      reminderAlerts.where((item) => item.type == 'Loan').length;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelCard(
+      title: 'Reminder Report',
+      icon: Icons.notification_important_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _ReminderSummaryPill(
+                label: 'Bills',
+                count: billCount,
+                color: const Color(0xFF2563EB),
+                icon: Icons.receipt_long_outlined,
+              ),
+              _ReminderSummaryPill(
+                label: 'Rent',
+                count: rentCount,
+                color: const Color(0xFF7C3AED),
+                icon: Icons.home_work_outlined,
+              ),
+              _ReminderSummaryPill(
+                label: 'Loans',
+                count: loanCount,
+                color: const Color(0xFFF59E0B),
+                icon: Icons.handshake_outlined,
+              ),
+              _ReminderSummaryPill(
+                label: 'Total',
+                count: reminderAlerts.length,
+                color: const Color(0xFF0F172A),
+                icon: Icons.notifications_active_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (reminderAlerts.isEmpty)
+            const _ReminderEmptyState()
+          else
+            ...reminderAlerts.map(
+              (alert) => _ReminderReportRow(alert: alert),
+            ),
+          const SizedBox(height: 14),
+          _ReminderSettingsNote(reminder: reminder),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderSummaryPill extends StatelessWidget {
+  const _ReminderSummaryPill({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 13,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: color.withOpacity(0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 17),
+          const SizedBox(width: 7),
+          Text(
+            '$label: $count',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderReportRow extends StatelessWidget {
+  const _ReminderReportRow({
+    required this.alert,
+  });
+
+  final ReminderAlert alert;
+
+  Color get color {
+    if (alert.type == 'Bill') return const Color(0xFF2563EB);
+    if (alert.type == 'Rent') return const Color(0xFF7C3AED);
+    if (alert.type == 'Loan') return const Color(0xFFF59E0B);
+
+    return const Color(0xFF0F172A);
+  }
+
+  IconData get icon {
+    if (alert.type == 'Bill') return Icons.receipt_long_outlined;
+    if (alert.type == 'Rent') return Icons.home_work_outlined;
+    if (alert.type == 'Loan') return Icons.handshake_outlined;
+
+    return Icons.notifications_active_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = alert.daysLeft == 0 ? 'Due Today' : '${alert.daysLeft}d left';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  alert.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  alert.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              badge,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderSettingsNote extends StatelessWidget {
+  const _ReminderSettingsNote({
+    required this.reminder,
+  });
+
+  final ReminderProvider reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color: Color(0xFF7C3AED),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Reminder window: ${reminder.remindBeforeDays} day(s) before due date. Channel: ${reminder.reminderChannel}. Email/SMS needs backend integration.',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderEmptyState extends StatelessWidget {
+  const _ReminderEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.notifications_none_outlined,
+            size: 48,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'No upcoming reminders',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Upcoming bills, rent collection, and loan reminders will appear here based on reminder settings.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
             ),
           ),
         ],

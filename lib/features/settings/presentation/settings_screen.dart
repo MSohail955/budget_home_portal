@@ -309,7 +309,8 @@ class SettingsScreen extends StatelessWidget {
                   _ReminderSwitchCard(
                     icon: Icons.analytics_outlined,
                     title: 'Monthly Summary',
-                    subtitle: 'Monthly summary reminder for income and expenses.',
+                    subtitle:
+                        'Monthly summary reminder for income and expenses.',
                     color: const Color(0xFF0F172A),
                     value: reminder.monthlySummaryEnabled,
                     onChanged: reminder.toggleMonthlySummary,
@@ -327,6 +328,121 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   const Text(
                     'Note: In-app reminders are configured now. Email/SMS sending needs backend integration in the next version.',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void openReminderContactSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return _SheetContainer(
+          child: Consumer2<ProfileProvider, ReminderProvider>(
+            builder: (context, profile, reminder, _) {
+              final email = profile.email.trim().isEmpty
+                  ? 'No email added'
+                  : profile.email.trim();
+
+              final phone = profile.phone.trim().isEmpty
+                  ? 'No phone number added'
+                  : profile.phone.trim();
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SheetTitle(
+                    title: 'Reminder Contact Setup',
+                    subtitle:
+                        'Review the email and phone number used for future reminder delivery.',
+                  ),
+                  const SizedBox(height: 20),
+                  _ReminderContactCard(
+                    icon: Icons.email_outlined,
+                    title: 'Registered Email',
+                    value: email,
+                    subtitle:
+                        'Email reminders will be sent to this address after backend integration.',
+                    color: const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderContactCard(
+                    icon: Icons.phone_outlined,
+                    title: 'Registered Phone',
+                    value: phone,
+                    subtitle:
+                        'SMS or phone reminders will use this number after backend integration.',
+                    color: const Color(0xFF16A34A),
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderContactCard(
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Preferred Reminder Channel',
+                    value: reminder.reminderChannel,
+                    subtitle:
+                        'You can change this from Reminder Settings anytime.',
+                    color: const Color(0xFF7C3AED),
+                  ),
+                  const SizedBox(height: 14),
+                  _TestReminderPreviewCard(
+                    reminder: reminder,
+                    profile: profile,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.send_outlined),
+                      label: const Text('Preview Test Reminder'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Test reminder preview ready for ${reminder.reminderChannel}',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit Profile Contact Details'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        openProfileSheet(context);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Note: This screen prepares reminder contact details. Actual email/SMS sending needs backend service such as SMTP, Firebase Functions, Twilio, or another provider.',
                     style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 12,
@@ -1050,6 +1166,16 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   _SettingsCard(
+                    icon: Icons.contact_mail_outlined,
+                    title: 'Reminder Contact Setup',
+                    subtitle:
+                        'Review email, phone and reminder channel before backend delivery.',
+                    iconColor: const Color(0xFF16A34A),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => openReminderContactSheet(context),
+                  ),
+                  const SizedBox(height: 14),
+                  _SettingsCard(
                     icon: Icons.backup_outlined,
                     title: 'Data Backup / Export',
                     subtitle: 'Download or copy all records as JSON or CSV.',
@@ -1440,6 +1566,140 @@ class _StatsPill extends StatelessWidget {
           fontWeight: FontWeight.w900,
           fontSize: 12,
         ),
+      ),
+    );
+  }
+}
+
+class _ReminderContactCard extends StatelessWidget {
+  const _ReminderContactCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TestReminderPreviewCard extends StatelessWidget {
+  const _TestReminderPreviewCard({
+    required this.reminder,
+    required this.profile,
+  });
+
+  final ReminderProvider reminder;
+  final ProfileProvider profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CircleAvatar(
+            radius: 24,
+            backgroundColor: Color(0xFFDBEAFE),
+            child: Icon(
+              Icons.message_outlined,
+              color: Color(0xFF2563EB),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Test Reminder Message',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Hi $name, this is a reminder preview. Your selected reminder channel is ${reminder.reminderChannel}, and reminders will trigger ${reminder.remindBeforeDays} day(s) before the due date.',
+                  style: const TextStyle(
+                    color: Color(0xFF1E3A8A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

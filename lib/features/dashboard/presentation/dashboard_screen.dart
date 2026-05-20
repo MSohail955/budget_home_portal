@@ -5,6 +5,7 @@ import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/dashboard_filter_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/providers/profile_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 import '../../../core/utils/report_filter_utils.dart';
 import '../../records/presentation/records_screen.dart';
 
@@ -133,6 +134,7 @@ class DashboardScreen extends StatelessWidget {
     final currency = context.watch<CurrencyProvider>();
     final finance = context.watch<FinanceProvider>();
     final filter = context.watch<DashboardFilterProvider>();
+    final reminder = context.watch<ReminderProvider>();
 
     final snapshot = buildSnapshot(
       finance: finance,
@@ -230,6 +232,7 @@ class DashboardScreen extends StatelessWidget {
                               child: _AlertsCard(
                                 currency: currency,
                                 snapshot: snapshot,
+                                reminder: reminder,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -248,6 +251,7 @@ class DashboardScreen extends StatelessWidget {
                           _AlertsCard(
                             currency: currency,
                             snapshot: snapshot,
+                            reminder: reminder,
                           ),
                           const SizedBox(height: 16),
                           _RecentActivityCard(
@@ -881,10 +885,12 @@ class _AlertsCard extends StatelessWidget {
   const _AlertsCard({
     required this.currency,
     required this.snapshot,
+    required this.reminder,
   });
 
   final CurrencyProvider currency;
   final DashboardSnapshot snapshot;
+  final ReminderProvider reminder;
 
   @override
   Widget build(BuildContext context) {
@@ -892,16 +898,17 @@ class _AlertsCard extends StatelessWidget {
     final unpaidRent = snapshot.rents.where((item) => !item.isPaid).length;
     final pendingLoans = snapshot.loans.where((item) => !item.isPaid).length;
 
-    final hasAlerts = unpaidBills > 0 || unpaidRent > 0 || pendingLoans > 0;
+    final hasPaymentAlerts =
+        unpaidBills > 0 || unpaidRent > 0 || pendingLoans > 0;
 
     return _PanelCard(
       title: 'Smart Alerts',
       icon: Icons.notifications_active_outlined,
       children: [
-        if (!hasAlerts)
+        if (!hasPaymentAlerts)
           const _EmptyMiniState(
             icon: Icons.check_circle_outline,
-            title: 'No alerts',
+            title: 'No pending payment alerts',
             subtitle: 'Pending bills, rent, and loans will appear here.',
           )
         else ...[
@@ -924,7 +931,145 @@ class _AlertsCard extends StatelessWidget {
             color: const Color(0xFF7C3AED),
           ),
         ],
+        const SizedBox(height: 6),
+        const _AlertSectionTitle(title: 'Reminder Rules'),
+        if (reminder.billRemindersEnabled) ...[
+          _ReminderRuleRow(
+            icon: Icons.wifi_outlined,
+            title: 'Internet Bill',
+            subtitle:
+                'Due day ${reminder.internetBillDay} every month • ${reminder.remindBeforeDays} days before',
+            color: const Color(0xFF2563EB),
+          ),
+          _ReminderRuleRow(
+            icon: Icons.school_outlined,
+            title: 'School Fees',
+            subtitle:
+                'Due day ${reminder.schoolFeesDay} every month • ${reminder.remindBeforeDays} days before',
+            color: const Color(0xFF16A34A),
+          ),
+          _ReminderRuleRow(
+            icon: Icons.electric_bolt_outlined,
+            title: 'Electricity Bill',
+            subtitle:
+                'Due day ${reminder.electricityBillDay} every month • ${reminder.remindBeforeDays} days before',
+            color: const Color(0xFFF59E0B),
+          ),
+        ],
+        if (reminder.rentRemindersEnabled)
+          _ReminderRuleRow(
+            icon: Icons.home_work_outlined,
+            title: 'Rent Collection',
+            subtitle:
+                'Reminder from day ${reminder.rentReminderStartDay} to ${reminder.rentReminderEndDay} every month',
+            color: const Color(0xFF7C3AED),
+          ),
+        if (reminder.loanRemindersEnabled)
+          _ReminderRuleRow(
+            icon: Icons.handshake_outlined,
+            title: 'Loan Reminders',
+            subtitle:
+                'Reminder ${reminder.remindBeforeDays} days before selected loan date',
+            color: const Color(0xFFEF4444),
+          ),
+        _ReminderRuleRow(
+          icon: Icons.notifications_none_outlined,
+          title: 'Reminder Channel',
+          subtitle:
+              '${reminder.reminderChannel} selected. Email/SMS needs backend integration.',
+          color: const Color(0xFF0F172A),
+        ),
       ],
+    );
+  }
+}
+
+class _AlertSectionTitle extends StatelessWidget {
+  const _AlertSectionTitle({
+    required this.title,
+  });
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.centerLeft,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderRuleRow extends StatelessWidget {
+  const _ReminderRuleRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/providers/profile_provider.dart';
+import '../../../core/providers/reminder_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -192,6 +193,150 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  void openReminderSettingsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return _SheetContainer(
+          child: Consumer<ReminderProvider>(
+            builder: (context, reminder, _) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SheetTitle(
+                    title: 'Reminder Settings',
+                    subtitle:
+                        'Set smart reminders for bills, school fees, rent collection, and loans.',
+                  ),
+                  const SizedBox(height: 20),
+                  _ReminderSwitchCard(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Bill Reminders',
+                    subtitle: reminder.generalReminderText,
+                    color: const Color(0xFF2563EB),
+                    value: reminder.billRemindersEnabled,
+                    onChanged: reminder.toggleBillReminders,
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderDayCard(
+                    icon: Icons.wifi_outlined,
+                    title: 'Internet Bill',
+                    subtitle: reminder.internetReminderText,
+                    color: const Color(0xFF2563EB),
+                    value: reminder.internetBillDay,
+                    onChanged: reminder.changeInternetBillDay,
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderDayCard(
+                    icon: Icons.school_outlined,
+                    title: 'School Fees',
+                    subtitle: reminder.schoolFeesReminderText,
+                    color: const Color(0xFF16A34A),
+                    value: reminder.schoolFeesDay,
+                    onChanged: reminder.changeSchoolFeesDay,
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderDayCard(
+                    icon: Icons.electric_bolt_outlined,
+                    title: 'Electricity Bill',
+                    subtitle: reminder.electricityReminderText,
+                    color: const Color(0xFFF59E0B),
+                    value: reminder.electricityBillDay,
+                    onChanged: reminder.changeElectricityBillDay,
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderSwitchCard(
+                    icon: Icons.home_work_outlined,
+                    title: 'Rent Collection Reminders',
+                    subtitle: reminder.rentReminderText,
+                    color: const Color(0xFF7C3AED),
+                    value: reminder.rentRemindersEnabled,
+                    onChanged: reminder.toggleRentReminders,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SmallNumberPicker(
+                          label: 'Rent Start Day',
+                          value: reminder.rentReminderStartDay,
+                          min: 1,
+                          max: 31,
+                          onChanged: reminder.changeRentStartDay,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _SmallNumberPicker(
+                          label: 'Rent End Day',
+                          value: reminder.rentReminderEndDay,
+                          min: 1,
+                          max: 31,
+                          onChanged: reminder.changeRentEndDay,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderSwitchCard(
+                    icon: Icons.handshake_outlined,
+                    title: 'Loan Reminders',
+                    subtitle: 'Remind before selected loan due date.',
+                    color: const Color(0xFFEF4444),
+                    value: reminder.loanRemindersEnabled,
+                    onChanged: reminder.toggleLoanReminders,
+                  ),
+                  const SizedBox(height: 14),
+                  _SmallNumberPicker(
+                    label: 'Remind Before Days',
+                    value: reminder.remindBeforeDays,
+                    min: 0,
+                    max: 15,
+                    onChanged: reminder.changeRemindBeforeDays,
+                  ),
+                  const SizedBox(height: 14),
+                  _ReminderChannelPicker(reminder: reminder),
+                  const SizedBox(height: 14),
+                  _ReminderSwitchCard(
+                    icon: Icons.analytics_outlined,
+                    title: 'Monthly Summary',
+                    subtitle: 'Monthly summary reminder for income and expenses.',
+                    color: const Color(0xFF0F172A),
+                    value: reminder.monthlySummaryEnabled,
+                    onChanged: reminder.toggleMonthlySummary,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.restart_alt),
+                      label: const Text('Reset Default Reminder Settings'),
+                      onPressed: reminder.resetDefaults,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Note: In-app reminders are configured now. Email/SMS sending needs backend integration in the next version.',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -467,9 +612,10 @@ class SettingsScreen extends StatelessWidget {
     BuildContext context,
     String jsonText,
   ) async {
-    final success = await context
-        .read<FinanceProvider>()
-        .importFinanceDataFromJson(jsonText);
+    final success =
+        await context.read<FinanceProvider>().importFinanceDataFromJson(
+              jsonText,
+            );
 
     if (!context.mounted) return;
 
@@ -885,15 +1031,22 @@ class SettingsScreen extends StatelessWidget {
                         color: Color(0xFF2563EB),
                       ),
                     ),
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Dark mode will be available soon'),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   _SettingsCard(
                     icon: Icons.notifications_outlined,
-                    title: 'Notifications',
-                    subtitle: 'Manage bill, rent, and loan reminders.',
+                    title: 'Reminder Settings',
+                    subtitle:
+                        'Configure internet, school, electricity, rent and loan reminders.',
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {},
+                    onTap: () => openReminderSettingsSheet(context),
                   ),
                   const SizedBox(height: 14),
                   _SettingsCard(
@@ -953,7 +1106,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     onTap: () => confirmLogout(context),
                   ),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -974,6 +1127,9 @@ class _SheetContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
@@ -1038,7 +1194,8 @@ class _ProfilePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
-    final email = profile.email.trim().isEmpty ? 'No email added' : profile.email;
+    final email =
+        profile.email.trim().isEmpty ? 'No email added' : profile.email;
     final phone = profile.phone.trim().isEmpty ? 'No phone' : profile.phone;
     final address =
         profile.address.trim().isEmpty ? 'No address' : profile.address;
@@ -1283,6 +1440,305 @@ class _StatsPill extends StatelessWidget {
           fontWeight: FontWeight.w900,
           fontSize: 12,
         ),
+      ),
+    );
+  }
+}
+
+class _ReminderSwitchCard extends StatelessWidget {
+  const _ReminderSwitchCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeColor: color,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderDayCard extends StatelessWidget {
+  const _ReminderDayCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _DayDropdown(
+            value: value,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayDropdown extends StatelessWidget {
+  const _DayDropdown({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<int>(
+        value: value,
+        borderRadius: BorderRadius.circular(18),
+        items: List.generate(31, (index) => index + 1)
+            .map(
+              (day) => DropdownMenuItem(
+                value: day,
+                child: Text(
+                  day.toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          if (value == null) return;
+          onChanged(value);
+        },
+      ),
+    );
+  }
+}
+
+class _SmallNumberPicker extends StatelessWidget {
+  const _SmallNumberPicker({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = [
+      for (int item = min; item <= max; item++) item,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: value,
+              borderRadius: BorderRadius.circular(18),
+              items: values
+                  .map(
+                    (day) => DropdownMenuItem(
+                      value: day,
+                      child: Text(
+                        day.toString(),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                onChanged(value);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderChannelPicker extends StatelessWidget {
+  const _ReminderChannelPicker({
+    required this.reminder,
+  });
+
+  final ReminderProvider reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 24,
+            backgroundColor: Color(0xFFEFF6FF),
+            child: Icon(
+              Icons.notifications_active_outlined,
+              color: Color(0xFF2563EB),
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Text(
+              'Reminder Channel',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: reminder.reminderChannel,
+              borderRadius: BorderRadius.circular(18),
+              items: reminder.reminderChannels
+                  .map(
+                    (channel) => DropdownMenuItem(
+                      value: channel,
+                      child: Text(
+                        channel,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                reminder.changeReminderChannel(value);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

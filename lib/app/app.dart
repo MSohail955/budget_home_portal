@@ -6,6 +6,7 @@ import '../core/providers/currency_provider.dart';
 import '../core/providers/dashboard_filter_provider.dart';
 import '../core/providers/finance_provider.dart';
 import '../core/providers/profile_provider.dart';
+import '../core/providers/reminder_provider.dart';
 import '../core/providers/report_filter_provider.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
@@ -25,6 +26,9 @@ class BudgetHomeApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => ReportFilterProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ReminderProvider(),
         ),
         ChangeNotifierProxyProvider<AuthProvider, CurrencyProvider>(
           create: (_) => CurrencyProvider(),

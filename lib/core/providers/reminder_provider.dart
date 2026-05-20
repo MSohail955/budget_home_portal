@@ -139,6 +139,79 @@ class ReminderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'billRemindersEnabled': _billRemindersEnabled,
+      'rentRemindersEnabled': _rentRemindersEnabled,
+      'loanRemindersEnabled': _loanRemindersEnabled,
+      'monthlySummaryEnabled': _monthlySummaryEnabled,
+      'internetBillDay': _internetBillDay,
+      'schoolFeesDay': _schoolFeesDay,
+      'electricityBillDay': _electricityBillDay,
+      'rentReminderStartDay': _rentReminderStartDay,
+      'rentReminderEndDay': _rentReminderEndDay,
+      'remindBeforeDays': _remindBeforeDays,
+      'reminderChannel': _reminderChannel,
+    };
+  }
+
+  void importFromJson(Map<String, dynamic>? data) {
+    if (data == null) return;
+
+    _billRemindersEnabled =
+        _readBool(data['billRemindersEnabled'], _billRemindersEnabled);
+    _rentRemindersEnabled =
+        _readBool(data['rentRemindersEnabled'], _rentRemindersEnabled);
+    _loanRemindersEnabled =
+        _readBool(data['loanRemindersEnabled'], _loanRemindersEnabled);
+    _monthlySummaryEnabled =
+        _readBool(data['monthlySummaryEnabled'], _monthlySummaryEnabled);
+
+    _internetBillDay = _readMonthDay(
+      data['internetBillDay'],
+      _internetBillDay,
+    );
+
+    _schoolFeesDay = _readMonthDay(
+      data['schoolFeesDay'],
+      _schoolFeesDay,
+    );
+
+    _electricityBillDay = _readMonthDay(
+      data['electricityBillDay'],
+      _electricityBillDay,
+    );
+
+    _rentReminderStartDay = _readMonthDay(
+      data['rentReminderStartDay'],
+      _rentReminderStartDay,
+    );
+
+    _rentReminderEndDay = _readMonthDay(
+      data['rentReminderEndDay'],
+      _rentReminderEndDay,
+    );
+
+    if (_rentReminderStartDay > _rentReminderEndDay) {
+      _rentReminderEndDay = _rentReminderStartDay;
+    }
+
+    _remindBeforeDays = _readIntInRange(
+      data['remindBeforeDays'],
+      _remindBeforeDays,
+      min: 0,
+      max: 15,
+    );
+
+    final channel = data['reminderChannel']?.toString();
+
+    if (channel != null && reminderChannels.contains(channel)) {
+      _reminderChannel = channel;
+    }
+
+    notifyListeners();
+  }
+
   String get internetReminderText {
     return 'Internet bill reminder on day $_internetBillDay every month.';
   }
@@ -161,5 +234,41 @@ class ReminderProvider extends ChangeNotifier {
 
   bool _isValidMonthDay(int value) {
     return value >= 1 && value <= 31;
+  }
+
+  bool _readBool(Object? value, bool fallback) {
+    if (value is bool) return value;
+
+    if (value is String) {
+      final lower = value.toLowerCase();
+
+      if (lower == 'true') return true;
+      if (lower == 'false') return false;
+    }
+
+    return fallback;
+  }
+
+  int _readMonthDay(Object? value, int fallback) {
+    final parsed = int.tryParse(value?.toString() ?? '');
+
+    if (parsed == null) return fallback;
+    if (!_isValidMonthDay(parsed)) return fallback;
+
+    return parsed;
+  }
+
+  int _readIntInRange(
+    Object? value,
+    int fallback, {
+    required int min,
+    required int max,
+  }) {
+    final parsed = int.tryParse(value?.toString() ?? '');
+
+    if (parsed == null) return fallback;
+    if (parsed < min || parsed > max) return fallback;
+
+    return parsed;
   }
 }

@@ -577,13 +577,28 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  String buildJsonExport(FinanceProvider finance) {
+  String buildJsonExport({
+    required FinanceProvider finance,
+    required ReminderProvider reminder,
+    required ProfileProvider profile,
+    required CurrencyProvider currency,
+  }) {
     final data = {
       'expenses': finance.expenses.map((item) => item.toJson()).toList(),
       'incomes': finance.incomes.map((item) => item.toJson()).toList(),
       'bills': finance.bills.map((item) => item.toJson()).toList(),
       'rents': finance.rents.map((item) => item.toJson()).toList(),
       'loans': finance.loans.map((item) => item.toJson()).toList(),
+      'reminderSettings': reminder.toJson(),
+      'profileContact': {
+        'name': profile.name,
+        'email': profile.email,
+        'phone': profile.phone,
+        'address': profile.address,
+      },
+      'currency': {
+        'code': currency.currencyCode,
+      },
       'exportedAt': DateTime.now().toIso8601String(),
     };
 
@@ -728,24 +743,89 @@ class SettingsScreen extends StatelessWidget {
     BuildContext context,
     String jsonText,
   ) async {
-    final success =
-        await context.read<FinanceProvider>().importFinanceDataFromJson(
-              jsonText,
-            );
+    try {
+      final decoded = jsonDecode(jsonText);
 
-    if (!context.mounted) return;
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Invalid backup format');
+      }
 
-    Navigator.pop(context);
+      final financeSuccess =
+          await context.read<FinanceProvider>().importFinanceDataFromJson(
+                jsonText,
+              );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Backup imported successfully'
-              : 'Invalid JSON backup format',
+      if (!context.mounted) return;
+
+      if (!financeSuccess) {
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid JSON backup format'),
+          ),
+        );
+        return;
+      }
+
+      final reminderSettings = decoded['reminderSettings'];
+
+      if (reminderSettings is Map<String, dynamic>) {
+        context.read<ReminderProvider>().importFromJson(reminderSettings);
+      }
+
+      final currencyData = decoded['currency'];
+
+      if (currencyData is Map<String, dynamic>) {
+        final code = currencyData['code']?.toString();
+
+        if (code != null &&
+            context
+                .read<CurrencyProvider>()
+                .availableCurrencies
+                .contains(code)) {
+          context.read<CurrencyProvider>().changeCurrency(code);
+        }
+      }
+
+      final profileContact = decoded['profileContact'];
+
+      if (profileContact is Map<String, dynamic>) {
+        final currentProfile = context.read<ProfileProvider>();
+
+        await currentProfile.updateProfile(
+          name: profileContact['name']?.toString().trim().isNotEmpty == true
+              ? profileContact['name'].toString()
+              : currentProfile.name,
+          email: profileContact['email']?.toString().trim().isNotEmpty == true
+              ? profileContact['email'].toString()
+              : currentProfile.email,
+          phone: profileContact['phone']?.toString() ?? currentProfile.phone,
+          address:
+              profileContact['address']?.toString() ?? currentProfile.address,
+        );
+      }
+
+      if (!context.mounted) return;
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backup imported successfully with reminder settings'),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid JSON backup format'),
+        ),
+      );
+    }
   }
 
   void selectAndImportJsonFile(BuildContext context) {
@@ -784,6 +864,9 @@ class SettingsScreen extends StatelessWidget {
 
   void openExportSheet(BuildContext context) {
     final finance = context.read<FinanceProvider>();
+    final reminder = context.read<ReminderProvider>();
+    final profile = context.read<ProfileProvider>();
+    final currency = context.read<CurrencyProvider>();
 
     showModalBottomSheet(
       context: context,
@@ -798,17 +881,22 @@ class SettingsScreen extends StatelessWidget {
               const _SheetTitle(
                 title: 'Export Data',
                 subtitle:
-                    'Download or copy your saved finance records as JSON or CSV.',
+                    'Download or copy your finance records, reminder settings, profile contact, and currency.',
               ),
               const SizedBox(height: 20),
               _ExportOptionCard(
                 icon: Icons.download_outlined,
                 title: 'Download JSON File',
-                subtitle: 'Best for backup and restoring later.',
+                subtitle: 'Best for full backup and restoring later.',
                 color: const Color(0xFF2563EB),
                 onTap: () {
                   downloadTextFile(
-                    content: buildJsonExport(finance),
+                    content: buildJsonExport(
+                      finance: finance,
+                      reminder: reminder,
+                      profile: profile,
+                      currency: currency,
+                    ),
                     fileName: buildFileName('json'),
                     mimeType: 'application/json',
                   );
@@ -836,12 +924,17 @@ class SettingsScreen extends StatelessWidget {
               _ExportOptionCard(
                 icon: Icons.data_object,
                 title: 'Copy JSON Export',
-                subtitle: 'Copy backup data directly to clipboard.',
+                subtitle: 'Copy full backup data directly to clipboard.',
                 color: const Color(0xFF7C3AED),
                 onTap: () {
                   copyToClipboard(
                     context,
-                    buildJsonExport(finance),
+                    buildJsonExport(
+                      finance: finance,
+                      reminder: reminder,
+                      profile: profile,
+                      currency: currency,
+                    ),
                     'JSON export',
                   );
                 },
@@ -862,7 +955,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Tip: CSV opens directly in Excel or Google Sheets.',
+                'Tip: JSON includes reminders, profile contact, and currency. CSV is mainly for records and reports.',
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,
@@ -979,7 +1072,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'Important: Import will replace current saved records.',
+                'Important: Import will replace current saved records and restore reminder settings if available.',
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,
@@ -1178,7 +1271,8 @@ class SettingsScreen extends StatelessWidget {
                   _SettingsCard(
                     icon: Icons.backup_outlined,
                     title: 'Data Backup / Export',
-                    subtitle: 'Download or copy all records as JSON or CSV.',
+                    subtitle:
+                        'Download records, reminders, profile contact, and currency.',
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openExportSheet(context),
                   ),
@@ -1186,7 +1280,8 @@ class SettingsScreen extends StatelessWidget {
                   _SettingsCard(
                     icon: Icons.upload_file_outlined,
                     title: 'Import JSON Backup',
-                    subtitle: 'Restore records from exported JSON backup file.',
+                    subtitle:
+                        'Restore records and reminder settings from JSON backup.',
                     iconColor: const Color(0xFF7C3AED),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openImportSheet(context),

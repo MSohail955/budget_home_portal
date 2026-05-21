@@ -611,7 +611,12 @@ class SettingsScreen extends StatelessWidget {
     return '"$escaped"';
   }
 
-  String buildCsvExport(FinanceProvider finance) {
+  String buildCsvExport({
+    required FinanceProvider finance,
+    required ReminderProvider reminder,
+    required ProfileProvider profile,
+    required CurrencyProvider currency,
+  }) {
     final rows = <List<Object?>>[
       [
         'Type',
@@ -683,6 +688,115 @@ class SettingsScreen extends StatelessWidget {
         '${item.loanType} | ${item.notes}',
       ]);
     }
+
+    rows.add([]);
+    rows.add(['Settings', 'Name', 'Value', '', '', '', '']);
+
+    rows.add(['Profile Contact', 'Name', profile.name, '', '', '', '']);
+    rows.add(['Profile Contact', 'Email', profile.email, '', '', '', '']);
+    rows.add(['Profile Contact', 'Phone', profile.phone, '', '', '', '']);
+    rows.add(['Profile Contact', 'Address', profile.address, '', '', '', '']);
+    rows.add(['Currency', 'Code', currency.currencyCode, '', '', '', '']);
+
+    rows.add([
+      'Reminder Setting',
+      'Bill Reminders Enabled',
+      reminder.billRemindersEnabled,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Internet Bill Day',
+      reminder.internetBillDay,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'School Fees Day',
+      reminder.schoolFeesDay,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Electricity Bill Day',
+      reminder.electricityBillDay,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Rent Reminders Enabled',
+      reminder.rentRemindersEnabled,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Rent Reminder Window',
+      '${reminder.rentReminderStartDay} to ${reminder.rentReminderEndDay}',
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Loan Reminders Enabled',
+      reminder.loanRemindersEnabled,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Monthly Summary Enabled',
+      reminder.monthlySummaryEnabled,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Remind Before Days',
+      reminder.remindBeforeDays,
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+    rows.add([
+      'Reminder Setting',
+      'Reminder Channel',
+      reminder.reminderChannel,
+      '',
+      '',
+      '',
+      '',
+    ]);
 
     return rows.map((row) => row.map(cleanCsvValue).join(',')).join('\n');
   }
@@ -908,11 +1022,17 @@ class SettingsScreen extends StatelessWidget {
               _ExportOptionCard(
                 icon: Icons.download_for_offline_outlined,
                 title: 'Download CSV File',
-                subtitle: 'Best for Excel, Google Sheets, and reports.',
+                subtitle:
+                    'Best for Excel, Google Sheets, reports, and reminder settings.',
                 color: const Color(0xFF16A34A),
                 onTap: () {
                   downloadTextFile(
-                    content: buildCsvExport(finance),
+                    content: buildCsvExport(
+                      finance: finance,
+                      reminder: reminder,
+                      profile: profile,
+                      currency: currency,
+                    ),
                     fileName: buildFileName('csv'),
                     mimeType: 'text/csv',
                   );
@@ -943,19 +1063,25 @@ class SettingsScreen extends StatelessWidget {
               _ExportOptionCard(
                 icon: Icons.table_chart_outlined,
                 title: 'Copy CSV Export',
-                subtitle: 'Copy CSV data directly to clipboard.',
+                subtitle:
+                    'Copy CSV records and settings directly to clipboard.',
                 color: const Color(0xFFF59E0B),
                 onTap: () {
                   copyToClipboard(
                     context,
-                    buildCsvExport(finance),
+                    buildCsvExport(
+                      finance: finance,
+                      reminder: reminder,
+                      profile: profile,
+                      currency: currency,
+                    ),
                     'CSV export',
                   );
                 },
               ),
               const SizedBox(height: 12),
               Text(
-                'Tip: JSON includes reminders, profile contact, and currency. CSV is mainly for records and reports.',
+                'Tip: JSON is best for restore. CSV is best for Excel/report review and now includes reminder settings too.',
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,

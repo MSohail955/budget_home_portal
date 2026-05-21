@@ -206,6 +206,7 @@ class DashboardScreen extends StatelessWidget {
                     pendingBills: pendingBillsCount,
                     pendingRent: pendingRentCount,
                     pendingLoans: pendingLoansCount,
+                    onOpenRecordSection: onOpenRecordSection,
                   ),
                   const SizedBox(height: 22),
                   GridView.count(
@@ -855,6 +856,7 @@ class _ReminderBadgeGrid extends StatelessWidget {
     required this.pendingBills,
     required this.pendingRent,
     required this.pendingLoans,
+    required this.onOpenRecordSection,
   });
 
   final bool isWide;
@@ -862,6 +864,7 @@ class _ReminderBadgeGrid extends StatelessWidget {
   final int pendingBills;
   final int pendingRent;
   final int pendingLoans;
+  final void Function(RecordSection section)? onOpenRecordSection;
 
   @override
   Widget build(BuildContext context) {
@@ -874,6 +877,13 @@ class _ReminderBadgeGrid extends StatelessWidget {
             : 'Due soon items',
         icon: Icons.event_available_outlined,
         color: const Color(0xFF2563EB),
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Upcoming reminders are shown below.'),
+            ),
+          );
+        },
       ),
       _ReminderBadgeCard(
         title: 'Pending Bills',
@@ -881,6 +891,7 @@ class _ReminderBadgeGrid extends StatelessWidget {
         subtitle: pendingBills == 0 ? 'All bills clear' : 'Bills unpaid',
         icon: Icons.receipt_long_outlined,
         color: const Color(0xFFDC2626),
+        onTap: () => onOpenRecordSection?.call(RecordSection.bills),
       ),
       _ReminderBadgeCard(
         title: 'Pending Rent',
@@ -888,6 +899,7 @@ class _ReminderBadgeGrid extends StatelessWidget {
         subtitle: pendingRent == 0 ? 'No rent pending' : 'Rent to collect',
         icon: Icons.home_work_outlined,
         color: const Color(0xFF7C3AED),
+        onTap: () => onOpenRecordSection?.call(RecordSection.rent),
       ),
       _ReminderBadgeCard(
         title: 'Pending Loans',
@@ -896,6 +908,7 @@ class _ReminderBadgeGrid extends StatelessWidget {
             pendingLoans == 0 ? 'No loan pending' : 'Loans need attention',
         icon: Icons.handshake_outlined,
         color: const Color(0xFFF59E0B),
+        onTap: () => onOpenRecordSection?.call(RecordSection.loans),
       ),
     ];
 
@@ -939,6 +952,7 @@ class _ReminderBadgeCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.color,
+    required this.onTap,
   });
 
   final String title;
@@ -946,82 +960,98 @@ class _ReminderBadgeCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final hasCount = count > 0;
 
-    return Container(
-      height: 112,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: hasCount ? color.withOpacity(0.08) : Colors.white,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: hasCount ? color.withOpacity(0.20) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: hasCount
-                ? color.withOpacity(0.08)
-                : Colors.black.withOpacity(0.03),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: color.withOpacity(0.12),
-            child: Icon(icon, color: color, size: 23),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  count.toString(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    height: 1,
-                  ),
-                ),
-              ],
+        onTap: onTap,
+        child: Ink(
+          height: 112,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: hasCount ? color.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: hasCount
+                  ? color.withOpacity(0.20)
+                  : const Color(0xFFE2E8F0),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: hasCount
+                    ? color.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.03),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(icon, color: color, size: 23),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count.toString(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: color.withOpacity(0.75),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

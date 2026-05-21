@@ -160,6 +160,15 @@ class DashboardScreen extends StatelessWidget {
         snapshot.rents.isNotEmpty ||
         snapshot.loans.isNotEmpty;
 
+    final pendingBillsCount =
+        snapshot.bills.where((item) => !item.isPaid).length;
+
+    final pendingRentCount =
+        snapshot.rents.where((item) => !item.isPaid).length;
+
+    final pendingLoansCount =
+        snapshot.loans.where((item) => !item.isPaid).length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -191,6 +200,14 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 22),
                   ],
+                  _ReminderBadgeGrid(
+                    isWide: isWide,
+                    upcomingReminders: upcomingAlerts.length,
+                    pendingBills: pendingBillsCount,
+                    pendingRent: pendingRentCount,
+                    pendingLoans: pendingLoansCount,
+                  ),
+                  const SizedBox(height: 22),
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -827,6 +844,185 @@ class _StarterPill extends StatelessWidget {
       backgroundColor: color.withOpacity(0.10),
       side: BorderSide(color: color.withOpacity(0.20)),
       onPressed: onTap,
+    );
+  }
+}
+
+class _ReminderBadgeGrid extends StatelessWidget {
+  const _ReminderBadgeGrid({
+    required this.isWide,
+    required this.upcomingReminders,
+    required this.pendingBills,
+    required this.pendingRent,
+    required this.pendingLoans,
+  });
+
+  final bool isWide;
+  final int upcomingReminders;
+  final int pendingBills;
+  final int pendingRent;
+  final int pendingLoans;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _ReminderBadgeCard(
+        title: 'Upcoming Reminders',
+        count: upcomingReminders,
+        subtitle: upcomingReminders == 0
+            ? 'No upcoming due items'
+            : 'Due soon items',
+        icon: Icons.event_available_outlined,
+        color: const Color(0xFF2563EB),
+      ),
+      _ReminderBadgeCard(
+        title: 'Pending Bills',
+        count: pendingBills,
+        subtitle: pendingBills == 0 ? 'All bills clear' : 'Bills unpaid',
+        icon: Icons.receipt_long_outlined,
+        color: const Color(0xFFDC2626),
+      ),
+      _ReminderBadgeCard(
+        title: 'Pending Rent',
+        count: pendingRent,
+        subtitle: pendingRent == 0 ? 'No rent pending' : 'Rent to collect',
+        icon: Icons.home_work_outlined,
+        color: const Color(0xFF7C3AED),
+      ),
+      _ReminderBadgeCard(
+        title: 'Pending Loans',
+        count: pendingLoans,
+        subtitle:
+            pendingLoans == 0 ? 'No loan pending' : 'Loans need attention',
+        icon: Icons.handshake_outlined,
+        color: const Color(0xFFF59E0B),
+      ),
+    ];
+
+    if (isWide) {
+      return Row(
+        children: [
+          for (int index = 0; index < cards.length; index++) ...[
+            Expanded(child: cards[index]),
+            if (index != cards.length - 1) const SizedBox(width: 16),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: cards[0]),
+            const SizedBox(width: 16),
+            Expanded(child: cards[1]),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: cards[2]),
+            const SizedBox(width: 16),
+            Expanded(child: cards[3]),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ReminderBadgeCard extends StatelessWidget {
+  const _ReminderBadgeCard({
+    required this.title,
+    required this.count,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final int count;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCount = count > 0;
+
+    return Container(
+      height: 112,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasCount ? color.withOpacity(0.08) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: hasCount ? color.withOpacity(0.20) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: hasCount
+                ? color.withOpacity(0.08)
+                : Colors.black.withOpacity(0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 25,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 23),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count.toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

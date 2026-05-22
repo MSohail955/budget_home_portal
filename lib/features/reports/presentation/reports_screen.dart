@@ -13,8 +13,91 @@ import '../../../core/utils/web_print_helper.dart';
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
 
+  DateTime todayOnly() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime? tryParseDate(String value) {
+    return DateTime.tryParse(value.trim());
+  }
+
+  bool isBillOverdue(BillRecord item) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return dueOnly.isBefore(todayOnly());
+  }
+
+  bool isBillDueSoon(BillRecord item, ReminderProvider reminder) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diff = dueOnly.difference(todayOnly()).inDays;
+
+    return diff >= 0 && diff <= reminder.remindBeforeDays;
+  }
+
+  bool isRentOverdue(RentRecord item) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return dueOnly.isBefore(todayOnly());
+  }
+
+  bool isRentInCollectionWindow(
+    RentRecord item,
+    ReminderProvider reminder,
+  ) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final today = todayOnly();
+
+    if (today.year != dueDate.year || today.month != dueDate.month) {
+      return false;
+    }
+
+    return today.day >= reminder.rentReminderStartDay &&
+        today.day <= reminder.rentReminderEndDay;
+  }
+
+  bool isLoanOverdue(LoanRecord item) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.date);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return dueOnly.isBefore(todayOnly());
+  }
+
+  bool isLoanDueSoon(LoanRecord item, ReminderProvider reminder) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.date);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diff = dueOnly.difference(todayOnly()).inDays;
+
+    return diff >= 0 && diff <= reminder.remindBeforeDays;
+  }
+
   ReportSnapshot buildSnapshot({
     required FinanceProvider finance,
+    required ReminderProvider reminder,
     required String selectedMonth,
     required String selectedYear,
   }) {
@@ -115,6 +198,13 @@ class ReportsScreen extends StatelessWidget {
       netBalance: netBalance,
       savingsRate: savingsRate,
       expenseRate: expenseRate,
+      dueSoonBills: bills.where((item) => isBillDueSoon(item, reminder)).length,
+      overdueBills: bills.where(isBillOverdue).length,
+      rentCollectionWindow:
+          rents.where((item) => isRentInCollectionWindow(item, reminder)).length,
+      overdueRent: rents.where(isRentOverdue).length,
+      dueSoonLoans: loans.where((item) => isLoanDueSoon(item, reminder)).length,
+      overdueLoans: loans.where(isLoanOverdue).length,
     );
   }
 
@@ -127,6 +217,7 @@ class ReportsScreen extends StatelessWidget {
 
     final snapshot = buildSnapshot(
       finance: finance,
+      reminder: reminder,
       selectedMonth: filter.selectedMonth,
       selectedYear: filter.selectedYear,
     );
@@ -209,6 +300,8 @@ class ReportsScreen extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 22),
+                  _ReminderHealthGrid(snapshot: snapshot),
+                  const SizedBox(height: 22),
                   _ReminderReportCard(
                     reminder: reminder,
                     reminderAlerts: reminderAlerts,
@@ -284,6 +377,12 @@ class ReportSnapshot {
     required this.netBalance,
     required this.savingsRate,
     required this.expenseRate,
+    required this.dueSoonBills,
+    required this.overdueBills,
+    required this.rentCollectionWindow,
+    required this.overdueRent,
+    required this.dueSoonLoans,
+    required this.overdueLoans,
   });
 
   final int totalRecords;
@@ -297,6 +396,12 @@ class ReportSnapshot {
   final double netBalance;
   final double savingsRate;
   final double expenseRate;
+  final int dueSoonBills;
+  final int overdueBills;
+  final int rentCollectionWindow;
+  final int overdueRent;
+  final int dueSoonLoans;
+  final int overdueLoans;
 }
 
 class _ReportsHeader extends StatelessWidget {
@@ -830,6 +935,170 @@ class _ReportSummaryCard extends StatelessWidget {
                 color: Color(0xFF0F172A),
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReminderHealthGrid extends StatelessWidget {
+  const _ReminderHealthGrid({
+    required this.snapshot,
+  });
+
+  final ReportSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _ReminderHealthCard(
+        title: 'Due Soon Bills',
+        count: snapshot.dueSoonBills,
+        icon: Icons.receipt_long_outlined,
+        color: const Color(0xFF2563EB),
+        subtitle: 'Bills inside reminder window',
+      ),
+      _ReminderHealthCard(
+        title: 'Overdue Bills',
+        count: snapshot.overdueBills,
+        icon: Icons.warning_amber_rounded,
+        color: const Color(0xFFDC2626),
+        subtitle: 'Unpaid bills past due date',
+      ),
+      _ReminderHealthCard(
+        title: 'Rent Collection Window',
+        count: snapshot.rentCollectionWindow,
+        icon: Icons.home_work_outlined,
+        color: const Color(0xFF7C3AED),
+        subtitle: 'Rent due in active window',
+      ),
+      _ReminderHealthCard(
+        title: 'Overdue Rent',
+        count: snapshot.overdueRent,
+        icon: Icons.event_busy_outlined,
+        color: const Color(0xFFEF4444),
+        subtitle: 'Pending rent past due date',
+      ),
+      _ReminderHealthCard(
+        title: 'Due Soon Loans',
+        count: snapshot.dueSoonLoans,
+        icon: Icons.handshake_outlined,
+        color: const Color(0xFFF59E0B),
+        subtitle: 'Loans inside reminder window',
+      ),
+      _ReminderHealthCard(
+        title: 'Overdue Loans',
+        count: snapshot.overdueLoans,
+        icon: Icons.report_problem_outlined,
+        color: const Color(0xFFB91C1C),
+        subtitle: 'Pending loans past due date',
+      ),
+    ];
+
+    return _PanelCard(
+      title: 'Reminder Health Summary',
+      icon: Icons.health_and_safety_outlined,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 850;
+
+          return GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: isWide ? 3 : 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: isWide ? 2.25 : 1.45,
+            children: cards,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReminderHealthCard extends StatelessWidget {
+  const _ReminderHealthCard({
+    required this.title,
+    required this.count,
+    required this.icon,
+    required this.color,
+    required this.subtitle,
+  });
+
+  final String title;
+  final int count;
+  final IconData icon;
+  final Color color;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAlert = count > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: hasAlert ? color.withOpacity(0.08) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: hasAlert ? color.withOpacity(0.18) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 180,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count.toString(),
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1374,6 +1643,36 @@ class _ReportDetailsCard extends StatelessWidget {
             title: 'Pending Loans Amount',
             value: currency.formatAmount(snapshot.pendingLoans),
             color: const Color(0xFF7C3AED),
+          ),
+          _ReportRow(
+            title: 'Due Soon Bills',
+            value: snapshot.dueSoonBills.toString(),
+            color: const Color(0xFF2563EB),
+          ),
+          _ReportRow(
+            title: 'Overdue Bills',
+            value: snapshot.overdueBills.toString(),
+            color: const Color(0xFFDC2626),
+          ),
+          _ReportRow(
+            title: 'Rent Collection Window',
+            value: snapshot.rentCollectionWindow.toString(),
+            color: const Color(0xFF7C3AED),
+          ),
+          _ReportRow(
+            title: 'Overdue Rent',
+            value: snapshot.overdueRent.toString(),
+            color: const Color(0xFFEF4444),
+          ),
+          _ReportRow(
+            title: 'Due Soon Loans',
+            value: snapshot.dueSoonLoans.toString(),
+            color: const Color(0xFFF59E0B),
+          ),
+          _ReportRow(
+            title: 'Overdue Loans',
+            value: snapshot.overdueLoans.toString(),
+            color: const Color(0xFFB91C1C),
           ),
           _ReportRow(
             title: 'Net Balance',

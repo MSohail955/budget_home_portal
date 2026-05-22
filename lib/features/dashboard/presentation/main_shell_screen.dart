@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../records/presentation/records_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -43,6 +44,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       RecordsScreen(
         key: recordsKey,
       ),
+      const NotificationsScreen(),
       const ReportsScreen(),
       const SettingsScreen(),
     ];
@@ -59,9 +61,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border(
+            border: const Border(
               top: BorderSide(
-                color: const Color(0xFFE2E8F0),
+                color: Color(0xFFE2E8F0),
                 width: 1,
               ),
             ),
@@ -89,6 +91,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 icon: Icon(Icons.folder_copy_outlined),
                 selectedIcon: Icon(Icons.folder_copy),
                 label: 'Records',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.notifications_none_outlined),
+                selectedIcon: Icon(Icons.notifications),
+                label: 'Alerts',
               ),
               NavigationDestination(
                 icon: Icon(Icons.pie_chart_outline),

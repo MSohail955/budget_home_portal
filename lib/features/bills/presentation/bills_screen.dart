@@ -5,6 +5,14 @@ import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/providers/reminder_provider.dart';
 
+enum BillStatusFilter {
+  all,
+  paid,
+  pending,
+  dueSoon,
+  overdue,
+}
+
 class BillsScreen extends StatefulWidget {
   const BillsScreen({super.key});
 
@@ -16,11 +24,39 @@ class _BillsScreenState extends State<BillsScreen> {
   final searchController = TextEditingController();
 
   String search = '';
+  BillStatusFilter selectedFilter = BillStatusFilter.all;
 
-  List<BillRecord> getFilteredBills(List<BillRecord> bills) {
-    if (search.trim().isEmpty) return bills;
+  List<BillRecord> getFilteredBills({
+    required List<BillRecord> bills,
+    required ReminderProvider reminder,
+  }) {
+    var filteredBills = bills;
 
-    return bills.where((item) {
+    filteredBills = filteredBills.where((item) {
+      if (selectedFilter == BillStatusFilter.all) return true;
+
+      if (selectedFilter == BillStatusFilter.paid) {
+        return item.isPaid;
+      }
+
+      if (selectedFilter == BillStatusFilter.pending) {
+        return !item.isPaid;
+      }
+
+      if (selectedFilter == BillStatusFilter.dueSoon) {
+        return isDueSoon(item, reminder.remindBeforeDays);
+      }
+
+      if (selectedFilter == BillStatusFilter.overdue) {
+        return isOverdue(item);
+      }
+
+      return true;
+    }).toList();
+
+    if (search.trim().isEmpty) return filteredBills;
+
+    return filteredBills.where((item) {
       final value = search.toLowerCase();
 
       return item.title.toLowerCase().contains(value) ||
@@ -29,6 +65,54 @@ class _BillsScreenState extends State<BillsScreen> {
           item.status.toLowerCase().contains(value) ||
           item.amount.toString().contains(value);
     }).toList();
+  }
+
+  DateTime todayOnly() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime? tryParseDate(String value) {
+    return DateTime.tryParse(value.trim());
+  }
+
+  bool isOverdue(BillRecord item) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+    return dueOnly.isBefore(todayOnly());
+  }
+
+  bool isDueSoon(BillRecord item, int remindBeforeDays) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diff = dueOnly.difference(todayOnly()).inDays;
+
+    return diff >= 0 && diff <= remindBeforeDays;
+  }
+
+  int countPaid(List<BillRecord> bills) {
+    return bills.where((item) => item.isPaid).length;
+  }
+
+  int countPending(List<BillRecord> bills) {
+    return bills.where((item) => !item.isPaid).length;
+  }
+
+  int countDueSoon(List<BillRecord> bills, ReminderProvider reminder) {
+    return bills.where((item) => isDueSoon(item, reminder.remindBeforeDays)).length;
+  }
+
+  int countOverdue(List<BillRecord> bills) {
+    return bills.where(isOverdue).length;
   }
 
   DateTime parseSavedDate(String value) {
@@ -479,7 +563,12 @@ class _BillsScreenState extends State<BillsScreen> {
   Widget build(BuildContext context) {
     final currency = context.watch<CurrencyProvider>();
     final finance = context.watch<FinanceProvider>();
-    final items = getFilteredBills(finance.bills);
+    final reminder = context.watch<ReminderProvider>();
+
+    final items = getFilteredBills(
+      bills: finance.bills,
+      reminder: reminder,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -524,6 +613,20 @@ class _BillsScreenState extends State<BillsScreen> {
                     currency: currency,
                   ),
                   const SizedBox(height: 18),
+                  _BillFilterBar(
+                    selectedFilter: selectedFilter,
+                    totalCount: finance.bills.length,
+                    paidCount: countPaid(finance.bills),
+                    pendingCount: countPending(finance.bills),
+                    dueSoonCount: countDueSoon(finance.bills, reminder),
+                    overdueCount: countOverdue(finance.bills),
+                    onChanged: (filter) {
+                      setState(() {
+                        selectedFilter = filter;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: searchController,
                     onChanged: (value) {
@@ -544,7 +647,11 @@ class _BillsScreenState extends State<BillsScreen> {
                   ),
                   const SizedBox(height: 18),
                   if (items.isEmpty)
-                    const _EmptyState()
+                    _EmptyState(
+                      message: selectedFilter == BillStatusFilter.all
+                          ? 'Add your first bill to start tracking.'
+                          : 'No bills match this filter.',
+                    )
                   else
                     ListView.separated(
                       shrinkWrap: true,
@@ -557,6 +664,9 @@ class _BillsScreenState extends State<BillsScreen> {
                         return _BillCard(
                           item: item,
                           currency: currency,
+                          reminder: reminder,
+                          isOverdue: isOverdue(item),
+                          isDueSoon: isDueSoon(item, reminder.remindBeforeDays),
                           onEdit: () => openBillSheet(existingBill: item),
                           onToggle: () => togglePaid(item),
                           onDelete: () => deleteBill(item),
@@ -572,6 +682,117 @@ class _BillsScreenState extends State<BillsScreen> {
       ),
     );
   }
+}
+
+class _BillFilterBar extends StatelessWidget {
+  const _BillFilterBar({
+    required this.selectedFilter,
+    required this.totalCount,
+    required this.paidCount,
+    required this.pendingCount,
+    required this.dueSoonCount,
+    required this.overdueCount,
+    required this.onChanged,
+  });
+
+  final BillStatusFilter selectedFilter;
+  final int totalCount;
+  final int paidCount;
+  final int pendingCount;
+  final int dueSoonCount;
+  final int overdueCount;
+  final ValueChanged<BillStatusFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final filters = [
+      _FilterData(
+        filter: BillStatusFilter.all,
+        label: 'All',
+        count: totalCount,
+        icon: Icons.list_alt_outlined,
+        color: const Color(0xFF2563EB),
+      ),
+      _FilterData(
+        filter: BillStatusFilter.paid,
+        label: 'Paid',
+        count: paidCount,
+        icon: Icons.check_circle_outline,
+        color: const Color(0xFF16A34A),
+      ),
+      _FilterData(
+        filter: BillStatusFilter.pending,
+        label: 'Pending',
+        count: pendingCount,
+        icon: Icons.schedule_outlined,
+        color: const Color(0xFFF59E0B),
+      ),
+      _FilterData(
+        filter: BillStatusFilter.dueSoon,
+        label: 'Due Soon',
+        count: dueSoonCount,
+        icon: Icons.notifications_active_outlined,
+        color: const Color(0xFF7C3AED),
+      ),
+      _FilterData(
+        filter: BillStatusFilter.overdue,
+        label: 'Overdue',
+        count: overdueCount,
+        icon: Icons.warning_amber_rounded,
+        color: const Color(0xFFDC2626),
+      ),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((item) {
+          final isSelected = selectedFilter == item.filter;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: ChoiceChip(
+              selected: isSelected,
+              showCheckmark: false,
+              avatar: Icon(
+                item.icon,
+                size: 18,
+                color: isSelected ? Colors.white : item.color,
+              ),
+              label: Text(
+                '${item.label} (${item.count})',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : item.color,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+              selectedColor: item.color,
+              backgroundColor: item.color.withOpacity(0.10),
+              side: BorderSide(color: item.color.withOpacity(0.25)),
+              onSelected: (_) => onChanged(item.filter),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _FilterData {
+  const _FilterData({
+    required this.filter,
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+  });
+
+  final BillStatusFilter filter;
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
 }
 
 class _PageHeader extends StatelessWidget {
@@ -673,6 +894,9 @@ class _BillCard extends StatelessWidget {
   const _BillCard({
     required this.item,
     required this.currency,
+    required this.reminder,
+    required this.isOverdue,
+    required this.isDueSoon,
     required this.onEdit,
     required this.onToggle,
     required this.onDelete,
@@ -680,6 +904,9 @@ class _BillCard extends StatelessWidget {
 
   final BillRecord item;
   final CurrencyProvider currency;
+  final ReminderProvider reminder;
+  final bool isOverdue;
+  final bool isDueSoon;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
@@ -707,17 +934,38 @@ class _BillCard extends StatelessWidget {
     return '${parsed.day.toString().padLeft(2, '0')} ${months[parsed.month - 1]} ${parsed.year}';
   }
 
+  String dueStatusText() {
+    if (item.isPaid) return 'Paid';
+    if (isOverdue) return 'Overdue';
+    if (isDueSoon) return 'Due Soon';
+
+    return 'Pending';
+  }
+
+  Color dueStatusColor() {
+    if (item.isPaid) return const Color(0xFF16A34A);
+    if (isOverdue) return const Color(0xFFDC2626);
+    if (isDueSoon) return const Color(0xFF7C3AED);
+
+    return const Color(0xFFF59E0B);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final statusColor =
-        item.isPaid ? const Color(0xFF16A34A) : const Color(0xFFF59E0B);
+    final statusColor = dueStatusColor();
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isOverdue
+              ? const Color(0xFFFECACA)
+              : isDueSoon
+                  ? const Color(0xFFDDD6FE)
+                  : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -741,7 +989,11 @@ class _BillCard extends StatelessWidget {
                       child: Icon(
                         item.isPaid
                             ? Icons.check_circle_outline
-                            : Icons.schedule_outlined,
+                            : isOverdue
+                                ? Icons.warning_amber_rounded
+                                : isDueSoon
+                                    ? Icons.notifications_active_outlined
+                                    : Icons.schedule_outlined,
                         color: statusColor,
                       ),
                     ),
@@ -755,13 +1007,25 @@ class _BillCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                InkWell(
-                  onTap: onToggle,
-                  borderRadius: BorderRadius.circular(30),
-                  child: _StatusPill(
-                    label: item.status,
-                    color: statusColor,
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    InkWell(
+                      onTap: onToggle,
+                      borderRadius: BorderRadius.circular(30),
+                      child: _StatusPill(
+                        label: item.status,
+                        color: item.isPaid
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    _StatusPill(
+                      label: dueStatusText(),
+                      color: statusColor,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -800,7 +1064,11 @@ class _BillCard extends StatelessWidget {
                 child: Icon(
                   item.isPaid
                       ? Icons.check_circle_outline
-                      : Icons.schedule_outlined,
+                      : isOverdue
+                          ? Icons.warning_amber_rounded
+                          : isDueSoon
+                              ? Icons.notifications_active_outlined
+                              : Icons.schedule_outlined,
                   color: statusColor,
                 ),
               ),
@@ -823,8 +1091,15 @@ class _BillCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(30),
                 child: _StatusPill(
                   label: item.status,
-                  color: statusColor,
+                  color: item.isPaid
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFF59E0B),
                 ),
+              ),
+              const SizedBox(width: 8),
+              _StatusPill(
+                label: dueStatusText(),
+                color: statusColor,
               ),
               const SizedBox(width: 12),
               Text(
@@ -1152,7 +1427,11 @@ InputDecoration _inputDecoration(String hint, IconData icon) {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({
+    required this.message,
+  });
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -1181,7 +1460,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Add your first bill to start tracking.',
+            message,
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600),
           ),

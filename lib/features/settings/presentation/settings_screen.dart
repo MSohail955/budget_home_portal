@@ -175,11 +175,9 @@ class SettingsScreen extends StatelessWidget {
                   onPressed: () async {
                     final result =
                         await context.read<AuthProvider>().changePassword(
-                              currentPassword:
-                                  currentPasswordController.text,
+                              currentPassword: currentPasswordController.text,
                               newPassword: newPasswordController.text,
-                              confirmPassword:
-                                  confirmPasswordController.text,
+                              confirmPassword: confirmPasswordController.text,
                             );
 
                     if (!context.mounted) return;
@@ -453,6 +451,85 @@ class SettingsScreen extends StatelessWidget {
                 ],
               );
             },
+          ),
+        );
+      },
+    );
+  }
+
+  void openAboutAppSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return _SheetContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SheetTitle(
+                title: 'About Budget Home Portal',
+                subtitle:
+                    'A smart home finance management app for bills, rent, loans, income, expenses, reports, and reminders.',
+              ),
+              const SizedBox(height: 20),
+              const _AboutInfoCard(
+                icon: Icons.apps_outlined,
+                title: 'App Version',
+                value: '1.0.0 Frontend Preview',
+                color: Color(0xFF2563EB),
+              ),
+              const SizedBox(height: 14),
+              const _AboutInfoCard(
+                icon: Icons.storage_outlined,
+                title: 'Data Storage',
+                value:
+                    'Your current data is stored locally in the app. Backend and database integration will be added in the next phase.',
+                color: Color(0xFF16A34A),
+              ),
+              const SizedBox(height: 14),
+              const _AboutInfoCard(
+                icon: Icons.notifications_active_outlined,
+                title: 'Reminder System',
+                value:
+                    'In-app reminder calculations are available now. Real email/SMS notifications require backend scheduler integration.',
+                color: Color(0xFFF59E0B),
+              ),
+              const SizedBox(height: 14),
+              const _AboutInfoCard(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy Note',
+                value:
+                    'This frontend version does not send your finance records to any server. Exported backup files should be kept safely.',
+                color: Color(0xFF7C3AED),
+              ),
+              const SizedBox(height: 14),
+              const _AboutInfoCard(
+                icon: Icons.engineering_outlined,
+                title: 'Next Production Step',
+                value:
+                    'Backend API, secure authentication, database, cloud backup, and real notification delivery.',
+                color: Color(0xFF0F172A),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Got it'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -1414,6 +1491,15 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   _SettingsCard(
+                    icon: Icons.info_outline,
+                    title: 'About App',
+                    subtitle: 'App version, privacy note, and production roadmap.',
+                    iconColor: const Color(0xFF0F172A),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => openAboutAppSheet(context),
+                  ),
+                  const SizedBox(height: 14),
+                  _SettingsCard(
                     icon: Icons.delete_sweep_outlined,
                     title: 'Clear All Data',
                     subtitle:
@@ -2296,6 +2382,68 @@ class _ExportOptionCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AboutInfoCard extends StatelessWidget {
+  const _AboutInfoCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: color.withOpacity(0.12),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

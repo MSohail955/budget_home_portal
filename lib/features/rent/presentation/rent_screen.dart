@@ -5,6 +5,14 @@ import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 import '../../../core/providers/reminder_provider.dart';
 
+enum RentStatusFilter {
+  all,
+  paid,
+  pending,
+  collectionWindow,
+  overdue,
+}
+
 class RentScreen extends StatefulWidget {
   const RentScreen({super.key});
 
@@ -16,6 +24,7 @@ class _RentScreenState extends State<RentScreen> {
   final searchController = TextEditingController();
 
   String search = '';
+  RentStatusFilter selectedFilter = RentStatusFilter.all;
 
   final months = const [
     'January',
@@ -41,10 +50,37 @@ class _RentScreenState extends State<RentScreen> {
     ];
   }
 
-  List<RentRecord> getFilteredRents(List<RentRecord> rents) {
-    if (search.trim().isEmpty) return rents;
+  List<RentRecord> getFilteredRents({
+    required List<RentRecord> rents,
+    required ReminderProvider reminder,
+  }) {
+    var filteredRents = rents;
 
-    return rents.where((item) {
+    filteredRents = filteredRents.where((item) {
+      if (selectedFilter == RentStatusFilter.all) return true;
+
+      if (selectedFilter == RentStatusFilter.paid) {
+        return item.isPaid;
+      }
+
+      if (selectedFilter == RentStatusFilter.pending) {
+        return !item.isPaid;
+      }
+
+      if (selectedFilter == RentStatusFilter.collectionWindow) {
+        return isInCollectionWindow(item, reminder);
+      }
+
+      if (selectedFilter == RentStatusFilter.overdue) {
+        return isOverdue(item);
+      }
+
+      return true;
+    }).toList();
+
+    if (search.trim().isEmpty) return filteredRents;
+
+    return filteredRents.where((item) {
       final value = search.toLowerCase();
 
       return item.propertyName.toLowerCase().contains(value) ||
@@ -57,6 +93,61 @@ class _RentScreenState extends State<RentScreen> {
           item.status.toLowerCase().contains(value) ||
           item.amount.toString().contains(value);
     }).toList();
+  }
+
+  DateTime todayOnly() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime? tryParseDate(String value) {
+    return DateTime.tryParse(value.trim());
+  }
+
+  bool isOverdue(RentRecord item) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final dueOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+    return dueOnly.isBefore(todayOnly());
+  }
+
+  bool isInCollectionWindow(RentRecord item, ReminderProvider reminder) {
+    if (item.isPaid) return false;
+
+    final dueDate = tryParseDate(item.dueDate);
+    if (dueDate == null) return false;
+
+    final today = todayOnly();
+
+    if (today.year != dueDate.year || today.month != dueDate.month) {
+      return false;
+    }
+
+    return today.day >= reminder.rentReminderStartDay &&
+        today.day <= reminder.rentReminderEndDay;
+  }
+
+  int countPaid(List<RentRecord> rents) {
+    return rents.where((item) => item.isPaid).length;
+  }
+
+  int countPending(List<RentRecord> rents) {
+    return rents.where((item) => !item.isPaid).length;
+  }
+
+  int countCollectionWindow(
+    List<RentRecord> rents,
+    ReminderProvider reminder,
+  ) {
+    return rents.where((item) => isInCollectionWindow(item, reminder)).length;
+  }
+
+  int countOverdue(List<RentRecord> rents) {
+    return rents.where(isOverdue).length;
   }
 
   DateTime parseSavedDate(String value) {
@@ -436,7 +527,8 @@ class _RentScreenState extends State<RentScreen> {
                                   amount <= 0) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Please enter valid rent data'),
+                                    content:
+                                        Text('Please enter valid rent data'),
                                   ),
                                 );
                                 return;
@@ -560,7 +652,12 @@ class _RentScreenState extends State<RentScreen> {
   Widget build(BuildContext context) {
     final currency = context.watch<CurrencyProvider>();
     final finance = context.watch<FinanceProvider>();
-    final items = getFilteredRents(finance.rents);
+    final reminder = context.watch<ReminderProvider>();
+
+    final items = getFilteredRents(
+      rents: finance.rents,
+      reminder: reminder,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -602,6 +699,21 @@ class _RentScreenState extends State<RentScreen> {
                     currency: currency,
                   ),
                   const SizedBox(height: 18),
+                  _RentFilterBar(
+                    selectedFilter: selectedFilter,
+                    totalCount: finance.rents.length,
+                    paidCount: countPaid(finance.rents),
+                    pendingCount: countPending(finance.rents),
+                    collectionWindowCount:
+                        countCollectionWindow(finance.rents, reminder),
+                    overdueCount: countOverdue(finance.rents),
+                    onChanged: (filter) {
+                      setState(() {
+                        selectedFilter = filter;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: searchController,
                     onChanged: (value) {
@@ -622,7 +734,11 @@ class _RentScreenState extends State<RentScreen> {
                   ),
                   const SizedBox(height: 18),
                   if (items.isEmpty)
-                    const _EmptyState()
+                    _EmptyState(
+                      message: selectedFilter == RentStatusFilter.all
+                          ? 'Add your first rent record to start tracking.'
+                          : 'No rent records match this filter.',
+                    )
                   else
                     ListView.separated(
                       shrinkWrap: true,
@@ -635,6 +751,9 @@ class _RentScreenState extends State<RentScreen> {
                         return _RentCard(
                           item: item,
                           currency: currency,
+                          isOverdue: isOverdue(item),
+                          isCollectionWindow:
+                              isInCollectionWindow(item, reminder),
                           onEdit: () => openRentSheet(existingRent: item),
                           onToggle: () => toggleStatus(item),
                           onDelete: () => deleteRent(item),
@@ -651,6 +770,117 @@ class _RentScreenState extends State<RentScreen> {
       ),
     );
   }
+}
+
+class _RentFilterBar extends StatelessWidget {
+  const _RentFilterBar({
+    required this.selectedFilter,
+    required this.totalCount,
+    required this.paidCount,
+    required this.pendingCount,
+    required this.collectionWindowCount,
+    required this.overdueCount,
+    required this.onChanged,
+  });
+
+  final RentStatusFilter selectedFilter;
+  final int totalCount;
+  final int paidCount;
+  final int pendingCount;
+  final int collectionWindowCount;
+  final int overdueCount;
+  final ValueChanged<RentStatusFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final filters = [
+      _RentFilterData(
+        filter: RentStatusFilter.all,
+        label: 'All',
+        count: totalCount,
+        icon: Icons.list_alt_outlined,
+        color: const Color(0xFF2563EB),
+      ),
+      _RentFilterData(
+        filter: RentStatusFilter.paid,
+        label: 'Paid',
+        count: paidCount,
+        icon: Icons.check_circle_outline,
+        color: const Color(0xFF16A34A),
+      ),
+      _RentFilterData(
+        filter: RentStatusFilter.pending,
+        label: 'Pending',
+        count: pendingCount,
+        icon: Icons.schedule_outlined,
+        color: const Color(0xFFF59E0B),
+      ),
+      _RentFilterData(
+        filter: RentStatusFilter.collectionWindow,
+        label: 'Collection Window',
+        count: collectionWindowCount,
+        icon: Icons.notifications_active_outlined,
+        color: const Color(0xFF7C3AED),
+      ),
+      _RentFilterData(
+        filter: RentStatusFilter.overdue,
+        label: 'Overdue',
+        count: overdueCount,
+        icon: Icons.warning_amber_rounded,
+        color: const Color(0xFFDC2626),
+      ),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((item) {
+          final isSelected = selectedFilter == item.filter;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: ChoiceChip(
+              selected: isSelected,
+              showCheckmark: false,
+              avatar: Icon(
+                item.icon,
+                size: 18,
+                color: isSelected ? Colors.white : item.color,
+              ),
+              label: Text(
+                '${item.label} (${item.count})',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : item.color,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+              selectedColor: item.color,
+              backgroundColor: item.color.withOpacity(0.10),
+              side: BorderSide(color: item.color.withOpacity(0.25)),
+              onSelected: (_) => onChanged(item.filter),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _RentFilterData {
+  const _RentFilterData({
+    required this.filter,
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+  });
+
+  final RentStatusFilter filter;
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
 }
 
 class _PageHeader extends StatelessWidget {
@@ -751,6 +981,8 @@ class _RentCard extends StatelessWidget {
   const _RentCard({
     required this.item,
     required this.currency,
+    required this.isOverdue,
+    required this.isCollectionWindow,
     required this.onEdit,
     required this.onToggle,
     required this.onDelete,
@@ -759,6 +991,8 @@ class _RentCard extends StatelessWidget {
 
   final RentRecord item;
   final CurrencyProvider currency;
+  final bool isOverdue;
+  final bool isCollectionWindow;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
@@ -772,17 +1006,38 @@ class _RentCard extends StatelessWidget {
     return readableDate(parsed);
   }
 
+  String rentStatusText() {
+    if (item.isPaid) return 'Paid';
+    if (isOverdue) return 'Overdue';
+    if (isCollectionWindow) return 'Collection Window';
+
+    return 'Pending';
+  }
+
+  Color rentStatusColor() {
+    if (item.isPaid) return const Color(0xFF16A34A);
+    if (isOverdue) return const Color(0xFFDC2626);
+    if (isCollectionWindow) return const Color(0xFF7C3AED);
+
+    return const Color(0xFFF59E0B);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final statusColor =
-        item.isPaid ? const Color(0xFF16A34A) : const Color(0xFFF59E0B);
+    final statusColor = rentStatusColor();
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isOverdue
+              ? const Color(0xFFFECACA)
+              : isCollectionWindow
+                  ? const Color(0xFFDDD6FE)
+                  : const Color(0xFFE2E8F0),
+        ),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -799,7 +1054,11 @@ class _RentCard extends StatelessWidget {
                       child: Icon(
                         item.isPaid
                             ? Icons.check_circle_outline
-                            : Icons.home_work_outlined,
+                            : isOverdue
+                                ? Icons.warning_amber_rounded
+                                : isCollectionWindow
+                                    ? Icons.notifications_active_outlined
+                                    : Icons.home_work_outlined,
                         color: statusColor,
                       ),
                     ),
@@ -813,10 +1072,25 @@ class _RentCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                InkWell(
-                  onTap: onToggle,
-                  borderRadius: BorderRadius.circular(30),
-                  child: _StatusPill(label: item.status, color: statusColor),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    InkWell(
+                      onTap: onToggle,
+                      borderRadius: BorderRadius.circular(30),
+                      child: _StatusPill(
+                        label: item.status,
+                        color: item.isPaid
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    _StatusPill(
+                      label: rentStatusText(),
+                      color: statusColor,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -855,7 +1129,11 @@ class _RentCard extends StatelessWidget {
                 child: Icon(
                   item.isPaid
                       ? Icons.check_circle_outline
-                      : Icons.home_work_outlined,
+                      : isOverdue
+                          ? Icons.warning_amber_rounded
+                          : isCollectionWindow
+                              ? Icons.notifications_active_outlined
+                              : Icons.home_work_outlined,
                   color: statusColor,
                 ),
               ),
@@ -876,7 +1154,17 @@ class _RentCard extends StatelessWidget {
               InkWell(
                 onTap: onToggle,
                 borderRadius: BorderRadius.circular(30),
-                child: _StatusPill(label: item.status, color: statusColor),
+                child: _StatusPill(
+                  label: item.status,
+                  color: item.isPaid
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFF59E0B),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _StatusPill(
+                label: rentStatusText(),
+                color: statusColor,
               ),
               const SizedBox(width: 12),
               Text(
@@ -1225,7 +1513,11 @@ InputDecoration _inputDecoration(String hint, IconData icon) {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({
+    required this.message,
+  });
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -1254,7 +1546,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Add your first rent record to start tracking.',
+            message,
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600),
           ),

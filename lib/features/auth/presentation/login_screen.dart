@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool rememberMe = true;
   bool obscurePassword = true;
+  bool isSubmitting = false;
 
   @override
   void dispose() {
@@ -22,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void login() {
+  Future<void> login() async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
@@ -36,7 +40,26 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    context.go('/app');
+    setState(() {
+      isSubmitting = true;
+    });
+
+    final result = await context.read<AuthProvider>().login(
+          email: email,
+          password: password,
+        );
+
+    if (!mounted) return;
+
+    setState(() {
+      isSubmitting = false;
+    });
+
+    showMessage(result.message);
+
+    if (result.success) {
+      context.go('/app');
+    }
   }
 
   void showMessage(String message) {
@@ -128,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         passwordController: passwordController,
                                         rememberMe: rememberMe,
                                         obscurePassword: obscurePassword,
+                                        isSubmitting: isSubmitting,
                                         onRememberChanged: (value) {
                                           setState(() {
                                             rememberMe = value;
@@ -152,6 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       passwordController: passwordController,
                                       rememberMe: rememberMe,
                                       obscurePassword: obscurePassword,
+                                      isSubmitting: isSubmitting,
                                       onRememberChanged: (value) {
                                         setState(() {
                                           rememberMe = value;
@@ -186,6 +211,7 @@ class _LoginForm extends StatelessWidget {
     required this.passwordController,
     required this.rememberMe,
     required this.obscurePassword,
+    required this.isSubmitting,
     required this.onRememberChanged,
     required this.onTogglePassword,
     required this.onLogin,
@@ -195,6 +221,7 @@ class _LoginForm extends StatelessWidget {
   final TextEditingController passwordController;
   final bool rememberMe;
   final bool obscurePassword;
+  final bool isSubmitting;
   final ValueChanged<bool> onRememberChanged;
   final VoidCallback onTogglePassword;
   final VoidCallback onLogin;
@@ -276,7 +303,8 @@ class _LoginForm extends StatelessWidget {
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Forgot password will be added with backend'),
+                      content:
+                          Text('Forgot password will be added with backend'),
                     ),
                   );
                 },
@@ -292,12 +320,22 @@ class _LoginForm extends StatelessWidget {
             width: double.infinity,
             height: 58,
             child: ElevatedButton.icon(
-              onPressed: onLogin,
-              icon: const Icon(Icons.login),
-              label: const Text('Login'),
+              onPressed: isSubmitting ? null : onLogin,
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.login),
+              label: Text(isSubmitting ? 'Logging in...' : 'Login'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF94A3B8),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -394,11 +432,26 @@ class _AuthSidePanel extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _FeaturePill(icon: Icons.receipt_long_outlined, label: 'Bills'),
-                  _FeaturePill(icon: Icons.home_work_outlined, label: 'Rent'),
-                  _FeaturePill(icon: Icons.handshake_outlined, label: 'Loans'),
-                  _FeaturePill(icon: Icons.notifications_active_outlined, label: 'Alerts'),
-                  _FeaturePill(icon: Icons.analytics_outlined, label: 'Reports'),
+                  _FeaturePill(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Bills',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.home_work_outlined,
+                    label: 'Rent',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.handshake_outlined,
+                    label: 'Loans',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Alerts',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.analytics_outlined,
+                    label: 'Reports',
+                  ),
                 ],
               ),
               const SizedBox(height: 28),
@@ -532,9 +585,9 @@ class _SmallBadge extends StatelessWidget {
         children: [
           Icon(icon, color: const Color(0xFF2563EB), size: 18),
           const SizedBox(width: 7),
-          const Text(
-            'Secure Login',
-            style: TextStyle(
+          Text(
+            label,
+            style: const TextStyle(
               color: Color(0xFF2563EB),
               fontWeight: FontWeight.w900,
               fontSize: 12,

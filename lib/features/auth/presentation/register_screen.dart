@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -18,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   bool acceptTerms = true;
+  bool isSubmitting = false;
 
   @override
   void dispose() {
@@ -29,7 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void register() {
+  Future<void> register() async {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
     final phone = phoneController.text.trim();
@@ -65,7 +69,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    context.go('/app');
+    setState(() {
+      isSubmitting = true;
+    });
+
+    final result = await context.read<AuthProvider>().register(
+          name: name,
+          email: email,
+          password: password,
+        );
+
+    if (!mounted) return;
+
+    setState(() {
+      isSubmitting = false;
+    });
+
+    showMessage(result.message);
+
+    if (result.success) {
+      context.go('/app');
+    }
   }
 
   void showMessage(String message) {
@@ -157,6 +181,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         obscureConfirmPassword:
                                             obscureConfirmPassword,
                                         acceptTerms: acceptTerms,
+                                        isSubmitting: isSubmitting,
                                         onTogglePassword: () {
                                           setState(() {
                                             obscurePassword = !obscurePassword;
@@ -193,6 +218,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       obscureConfirmPassword:
                                           obscureConfirmPassword,
                                       acceptTerms: acceptTerms,
+                                      isSubmitting: isSubmitting,
                                       onTogglePassword: () {
                                         setState(() {
                                           obscurePassword = !obscurePassword;
@@ -237,6 +263,7 @@ class _RegisterForm extends StatelessWidget {
     required this.obscurePassword,
     required this.obscureConfirmPassword,
     required this.acceptTerms,
+    required this.isSubmitting,
     required this.onTogglePassword,
     required this.onToggleConfirmPassword,
     required this.onAcceptChanged,
@@ -251,6 +278,7 @@ class _RegisterForm extends StatelessWidget {
   final bool obscurePassword;
   final bool obscureConfirmPassword;
   final bool acceptTerms;
+  final bool isSubmitting;
   final VoidCallback onTogglePassword;
   final VoidCallback onToggleConfirmPassword;
   final ValueChanged<bool> onAcceptChanged;
@@ -366,12 +394,24 @@ class _RegisterForm extends StatelessWidget {
             width: double.infinity,
             height: 58,
             child: ElevatedButton.icon(
-              onPressed: onRegister,
-              icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Create Account'),
+              onPressed: isSubmitting ? null : onRegister,
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.person_add_alt_1),
+              label: Text(
+                isSubmitting ? 'Creating account...' : 'Create Account',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF94A3B8),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -468,11 +508,26 @@ class _RegisterSidePanel extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _FeaturePill(icon: Icons.dashboard_outlined, label: 'Dashboard'),
-                  _FeaturePill(icon: Icons.folder_copy_outlined, label: 'Records'),
-                  _FeaturePill(icon: Icons.notifications_active_outlined, label: 'Alerts'),
-                  _FeaturePill(icon: Icons.pie_chart_outline, label: 'Reports'),
-                  _FeaturePill(icon: Icons.backup_outlined, label: 'Backup'),
+                  _FeaturePill(
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.folder_copy_outlined,
+                    label: 'Records',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Alerts',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.pie_chart_outline,
+                    label: 'Reports',
+                  ),
+                  _FeaturePill(
+                    icon: Icons.backup_outlined,
+                    label: 'Backup',
+                  ),
                 ],
               ),
               const SizedBox(height: 28),

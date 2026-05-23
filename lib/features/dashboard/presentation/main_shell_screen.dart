@@ -88,7 +88,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
             today.day >= reminder.rentReminderStartDay &&
             today.day <= reminder.rentReminderEndDay;
 
-        if (left < 0 || left <= reminder.remindBeforeDays || isCollectionWindow) {
+        if (left < 0 ||
+            left <= reminder.remindBeforeDays ||
+            isCollectionWindow) {
           count++;
         }
       }
@@ -135,70 +137,179 @@ class _MainShellScreenState extends State<MainShellScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      extendBody: false,
+      backgroundColor: const Color(0xFFF4F7FB),
+      extendBody: true,
       body: IndexedStack(
         index: selectedIndex,
         children: pages,
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: const Border(
-              top: BorderSide(
-                color: Color(0xFFE2E8F0),
-                width: 1,
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        child: _PremiumBottomNavigation(
+          selectedIndex: selectedIndex,
+          alertCount: alertCount,
+          onChanged: changeTab,
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumBottomNavigation extends StatelessWidget {
+  const _PremiumBottomNavigation({
+    required this.selectedIndex,
+    required this.alertCount,
+    required this.onChanged,
+  });
+
+  final int selectedIndex;
+  final int alertCount;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _NavItem(
+        label: 'Home',
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard_rounded,
+        color: const Color(0xFF2563EB),
+      ),
+      _NavItem(
+        label: 'Records',
+        icon: Icons.folder_copy_outlined,
+        selectedIcon: Icons.folder_copy_rounded,
+        color: const Color(0xFF16A34A),
+      ),
+      _NavItem(
+        label: 'Alerts',
+        icon: Icons.notifications_none_outlined,
+        selectedIcon: Icons.notifications_rounded,
+        color: const Color(0xFFF59E0B),
+        badgeCount: alertCount,
+      ),
+      _NavItem(
+        label: 'Reports',
+        icon: Icons.pie_chart_outline,
+        selectedIcon: Icons.pie_chart_rounded,
+        color: const Color(0xFF7C3AED),
+      ),
+      _NavItem(
+        label: 'Settings',
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings_rounded,
+        color: const Color(0xFF0F172A),
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.20),
+            blurRadius: 30,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+
+          return Row(
+            children: [
+              for (int index = 0; index < items.length; index++)
+                Expanded(
+                  child: _PremiumNavButton(
+                    item: items[index],
+                    selected: selectedIndex == index,
+                    compact: compact,
+                    onTap: () => onChanged(index),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PremiumNavButton extends StatelessWidget {
+  const _PremiumNavButton({
+    required this.item,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final _NavItem item;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = selected ? item.selectedIcon : item.icon;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            height: 58,
+            padding: EdgeInsets.symmetric(
+              horizontal: selected && !compact ? 12 : 8,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: selected ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: selected
+                    ? item.color.withOpacity(0.16)
+                    : Colors.transparent,
               ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 20,
-                offset: const Offset(0, -8),
-              ),
-            ],
-          ),
-          child: NavigationBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            height: 72,
-            selectedIndex: selectedIndex,
-            onDestinationSelected: changeTab,
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Home',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.folder_copy_outlined),
-                selectedIcon: Icon(Icons.folder_copy),
-                label: 'Records',
-              ),
-              NavigationDestination(
-                icon: _AlertNavIcon(
-                  count: alertCount,
-                  selected: false,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _NavIconWithBadge(
+                  icon: icon,
+                  color: selected ? item.color : Colors.white70,
+                  badgeCount: item.badgeCount,
+                  selected: selected,
                 ),
-                selectedIcon: _AlertNavIcon(
-                  count: alertCount,
-                  selected: true,
-                ),
-                label: 'Alerts',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.pie_chart_outline),
-                selectedIcon: Icon(Icons.pie_chart),
-                label: 'Reports',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
-            ],
+                if (selected && !compact) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: item.color,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -206,29 +317,35 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 }
 
-class _AlertNavIcon extends StatelessWidget {
-  const _AlertNavIcon({
-    required this.count,
+class _NavIconWithBadge extends StatelessWidget {
+  const _NavIconWithBadge({
+    required this.icon,
+    required this.color,
+    required this.badgeCount,
     required this.selected,
   });
 
-  final int count;
+  final IconData icon;
+  final Color color;
+  final int badgeCount;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    final displayCount = count > 99 ? '99+' : count.toString();
+    final displayCount = badgeCount > 99 ? '99+' : badgeCount.toString();
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Icon(
-          selected ? Icons.notifications : Icons.notifications_none_outlined,
+          icon,
+          color: color,
+          size: selected ? 24 : 23,
         ),
-        if (count > 0)
+        if (badgeCount > 0)
           Positioned(
-            right: -9,
-            top: -7,
+            right: -11,
+            top: -9,
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 5,
@@ -238,7 +355,7 @@ class _AlertNavIcon extends StatelessWidget {
                 color: const Color(0xFFDC2626),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.white,
+                  color: selected ? Colors.white : const Color(0xFF0F172A),
                   width: 1.5,
                 ),
               ),
@@ -261,4 +378,20 @@ class _AlertNavIcon extends StatelessWidget {
       ],
     );
   }
+}
+
+class _NavItem {
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.color,
+    this.badgeCount = 0,
+  });
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Color color;
+  final int badgeCount;
 }

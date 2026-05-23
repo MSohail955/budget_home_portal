@@ -1,7 +1,8 @@
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/auth_provider.dart';
-import '../../features/auth/presentation/auth_screen.dart';
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/register_screen.dart';
 import '../../features/dashboard/presentation/main_shell_screen.dart';
 
 class AppRouter {
@@ -11,6 +12,7 @@ class AppRouter {
       refreshListenable: authProvider,
       redirect: (context, state) {
         final isAuthRoute = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register' ||
             state.matchedLocation == '/auth';
 
         if (authProvider.isLoading) {
@@ -34,11 +36,15 @@ class AppRouter {
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => const AuthScreen(),
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/register',
+          builder: (context, state) => const RegisterScreen(),
         ),
         GoRoute(
           path: '/auth',
-          builder: (context, state) => const AuthScreen(),
+          redirect: (context, state) => '/login',
         ),
         GoRoute(
           path: '/app',

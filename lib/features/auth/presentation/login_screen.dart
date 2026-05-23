@@ -26,6 +26,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Future<void> login() async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
@@ -62,9 +70,283 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void openForgotPasswordSheet() {
+    final parentContext = context;
+
+    final resetEmailController = TextEditingController(
+      text: emailController.text.trim(),
+    );
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
+    bool isResetting = false;
+
+    showModalBottomSheet(
+      context: parentContext,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (localContext, setSheetState) {
+            void showSheetMessage(String message) {
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                SnackBar(content: Text(message)),
+              );
+            }
+
+            Future<void> resetPassword() async {
+              final email = resetEmailController.text.trim();
+              final newPassword = newPasswordController.text.trim();
+              final confirmPassword = confirmPasswordController.text.trim();
+
+              if (email.isEmpty ||
+                  newPassword.isEmpty ||
+                  confirmPassword.isEmpty) {
+                showSheetMessage('Please fill all reset password fields');
+                return;
+              }
+
+              if (!email.contains('@')) {
+                showSheetMessage('Please enter a valid email address');
+                return;
+              }
+
+              if (newPassword.length < 6) {
+                showSheetMessage('New password must be at least 6 characters');
+                return;
+              }
+
+              if (newPassword != confirmPassword) {
+                showSheetMessage(
+                  'New password and confirm password do not match',
+                );
+                return;
+              }
+
+              setSheetState(() {
+                isResetting = true;
+              });
+
+              final result =
+                  await parentContext.read<AuthProvider>().resetPassword(
+                        email: email,
+                        newPassword: newPassword,
+                        confirmPassword: confirmPassword,
+                      );
+
+              if (!mounted || !localContext.mounted) return;
+
+              if (result.success) {
+                emailController.text = email;
+                passwordController.clear();
+
+                Navigator.of(sheetContext, rootNavigator: true).pop();
+
+                Future.microtask(() {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    SnackBar(content: Text(result.message)),
+                  );
+                });
+
+                return;
+              }
+
+              setSheetState(() {
+                isResetting = false;
+              });
+
+              showSheetMessage(result.message);
+            }
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(localContext).size.height * 0.90,
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(localContext).viewInsets.bottom + 20,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _SheetHeader(
+                          title: 'Reset Password',
+                          subtitle:
+                              'Enter your registered email and set a new password for your local account.',
+                          icon: Icons.lock_reset_outlined,
+                        ),
+                        const SizedBox(height: 20),
+                        _AuthField(
+                          controller: resetEmailController,
+                          hint: 'Registered email address',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 14),
+                        _AuthField(
+                          controller: newPasswordController,
+                          hint: 'New password',
+                          icon: Icons.lock_outline,
+                          obscureText: obscureNewPassword,
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setSheetState(() {
+                                obscureNewPassword = !obscureNewPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureNewPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _AuthField(
+                          controller: confirmPasswordController,
+                          hint: 'Confirm new password',
+                          icon: Icons.verified_user_outlined,
+                          obscureText: obscureConfirmPassword,
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setSheetState(() {
+                                obscureConfirmPassword =
+                                    !obscureConfirmPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureConfirmPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: const Color(0xFFBFDBFE),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Color(0xFF2563EB),
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'This reset works for locally saved frontend accounts. Backend email reset will be added in production.',
+                                  style: TextStyle(
+                                    color: Color(0xFF1E3A8A),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton.icon(
+                            onPressed: isResetting ? null : resetPassword,
+                            icon: isResetting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.lock_reset_outlined),
+                            label: Text(
+                              isResetting
+                                  ? 'Resetting password...'
+                                  : 'Reset Password',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFF94A3B8),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: isResetting
+                                ? null
+                                : () {
+                                    Navigator.of(
+                                      sheetContext,
+                                      rootNavigator: true,
+                                    ).pop();
+                                  },
+                            icon: const Icon(Icons.close),
+                            label: const Text('Cancel'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF475569),
+                              side: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -162,6 +444,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                             obscurePassword = !obscurePassword;
                                           });
                                         },
+                                        onForgotPassword:
+                                            openForgotPasswordSheet,
                                         onLogin: login,
                                       ),
                                     ),
@@ -187,6 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           obscurePassword = !obscurePassword;
                                         });
                                       },
+                                      onForgotPassword: openForgotPasswordSheet,
                                       onLogin: login,
                                     ),
                                   ],
@@ -214,6 +499,7 @@ class _LoginForm extends StatelessWidget {
     required this.isSubmitting,
     required this.onRememberChanged,
     required this.onTogglePassword,
+    required this.onForgotPassword,
     required this.onLogin,
   });
 
@@ -224,6 +510,7 @@ class _LoginForm extends StatelessWidget {
   final bool isSubmitting;
   final ValueChanged<bool> onRememberChanged;
   final VoidCallback onTogglePassword;
+  final VoidCallback onForgotPassword;
   final VoidCallback onLogin;
 
   @override
@@ -300,14 +587,7 @@ class _LoginForm extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Forgot password will be added with backend'),
-                    ),
-                  );
-                },
+                onPressed: onForgotPassword,
                 child: const Text(
                   'Forgot?',
                   style: TextStyle(fontWeight: FontWeight.w900),
@@ -484,6 +764,59 @@ class _AuthSidePanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SheetHeader extends StatelessWidget {
+  const _SheetHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 26,
+          backgroundColor: const Color(0xFFEFF6FF),
+          child: Icon(
+            icon,
+            color: const Color(0xFF2563EB),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

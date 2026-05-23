@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/dashboard_filter_provider.dart';
 import '../../../core/providers/finance_provider.dart';
@@ -137,6 +139,311 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  Future<void> quickLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFFEE2E2),
+                child: Icon(
+                  Icons.logout,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Logout'),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout from Budget Home?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true) return;
+
+    await context.read<AuthProvider>().logout();
+
+    if (!context.mounted) return;
+
+    context.go('/login');
+  }
+
+  void openDashboardSearch(BuildContext context) {
+    final searchController = TextEditingController();
+    String query = '';
+
+    final actions = [
+      _DashboardSearchAction(
+        title: 'Add Income',
+        subtitle: 'Create or manage salary, business and income records.',
+        icon: Icons.trending_up_outlined,
+        color: const Color(0xFF16A34A),
+        section: RecordSection.income,
+        keywords: 'income salary business earning received money add income',
+      ),
+      _DashboardSearchAction(
+        title: 'Add Expense',
+        subtitle: 'Create or manage groceries, shopping and expense records.',
+        icon: Icons.shopping_bag_outlined,
+        color: const Color(0xFFDC2626),
+        section: RecordSection.expenses,
+        keywords:
+            'expense expenses spending grocery shopping cost payment add expense',
+      ),
+      _DashboardSearchAction(
+        title: 'Track Bills',
+        subtitle: 'Manage electricity, internet, water and unpaid bills.',
+        icon: Icons.receipt_long_outlined,
+        color: const Color(0xFF2563EB),
+        section: RecordSection.bills,
+        keywords: 'bill bills electricity internet water due unpaid reminder',
+      ),
+      _DashboardSearchAction(
+        title: 'Track Rent',
+        subtitle: 'Manage rent collection, tenants and property payments.',
+        icon: Icons.home_work_outlined,
+        color: const Color(0xFF7C3AED),
+        section: RecordSection.rent,
+        keywords: 'rent tenant property collection home pending rent',
+      ),
+      _DashboardSearchAction(
+        title: 'Track Loans',
+        subtitle: 'Manage loans taken, given, pending and paid.',
+        icon: Icons.handshake_outlined,
+        color: const Color(0xFFF59E0B),
+        section: RecordSection.loans,
+        keywords: 'loan loans borrowed given taken pending paid personal',
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final filteredActions = actions.where((item) {
+              final value = query.trim().toLowerCase();
+
+              if (value.isEmpty) return true;
+
+              return item.title.toLowerCase().contains(value) ||
+                  item.subtitle.toLowerCase().contains(value) ||
+                  item.keywords.toLowerCase().contains(value);
+            }).toList();
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.88,
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF2563EB),
+                                  Color(0xFF7C3AED),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(
+                              Icons.search,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Search Budget Home',
+                                  style: TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Search and jump directly to the feature you need.',
+                                  style: TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        onChanged: (value) {
+                          setSheetState(() {
+                            query = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search income, bills, rent, loans...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: query.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    searchController.clear();
+                                    setSheetState(() {
+                                      query = '';
+                                    });
+                                  },
+                                  icon: const Icon(Icons.close),
+                                ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Flexible(
+                        child: filteredActions.isEmpty
+                            ? const _SearchEmptyState()
+                            : ListView.separated(
+                                shrinkWrap: true,
+                                itemCount: filteredActions.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (context, index) {
+                                  final item = filteredActions[index];
+
+                                  return Material(
+                                    color: item.color.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(22),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(22),
+                                      onTap: () {
+                                        Navigator.of(context).pop();
+                                        onOpenRecordSection?.call(item.section);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(15),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 24,
+                                              backgroundColor:
+                                                  item.color.withOpacity(0.14),
+                                              child: Icon(
+                                                item.icon,
+                                                color: item.color,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 14),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    item.title,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF0F172A),
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    item.subtitle,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF64748B),
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.arrow_forward_ios,
+                                              size: 15,
+                                              color: item.color,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 900;
@@ -171,25 +478,32 @@ class DashboardScreen extends StatelessWidget {
     final pendingBillsCount =
         snapshot.bills.where((item) => !item.isPaid).length;
 
-    final pendingRentCount =
-        snapshot.rents.where((item) => !item.isPaid).length;
+    final pendingRentCount = snapshot.rents.where((item) => !item.isPaid).length;
 
     final pendingLoansCount =
         snapshot.loans.where((item) => !item.isPaid).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FC),
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1220),
+              constraints: const BoxConstraints(maxWidth: 1240),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _AnimatedEntry(
                     delay: 0,
+                    child: _DashboardTopBar(
+                      onSearchTap: () => openDashboardSearch(context),
+                      onLogoutTap: () => quickLogout(context),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _AnimatedEntry(
+                    delay: 60,
                     child: _PremiumHeader(
                       selectedMonth: snapshot.selectedMonth,
                       selectedYear: snapshot.selectedYear,
@@ -200,7 +514,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   const _AnimatedEntry(
-                    delay: 80,
+                    delay: 120,
                     child: _DashboardFilterCard(),
                   ),
                   const SizedBox(height: 22),
@@ -414,11 +728,26 @@ class DashboardSnapshot {
   final double commitmentRate;
 }
 
-class _AnimatedEntry extends StatelessWidget {
-  const _AnimatedEntry({
-    required this.child,
-    required this.delay,
+class _DashboardSearchAction {
+  const _DashboardSearchAction({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.section,
+    required this.keywords,
   });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final RecordSection section;
+  final String keywords;
+}
+
+class _AnimatedEntry extends StatelessWidget {
+  const _AnimatedEntry({required this.child, required this.delay});
 
   final Widget child;
   final int delay;
@@ -426,7 +755,7 @@ class _AnimatedEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 550 + delay),
+      duration: Duration(milliseconds: 520 + delay),
       tween: Tween(begin: 0, end: 1),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
@@ -439,6 +768,613 @@ class _AnimatedEntry extends StatelessWidget {
         );
       },
       child: child,
+    );
+  }
+}
+
+
+class _DashboardTopBar extends StatelessWidget {
+  const _DashboardTopBar({
+    required this.onSearchTap,
+    required this.onLogoutTap,
+  });
+
+  final VoidCallback onSearchTap;
+  final VoidCallback onLogoutTap;
+
+  void _openProfileDetails(BuildContext context) {
+    final profile = context.read<ProfileProvider>();
+    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
+    final email = profile.email.trim().isEmpty
+        ? 'No email added'
+        : profile.email.trim();
+    final phone = profile.phone.trim().isEmpty
+        ? 'No phone added'
+        : profile.phone.trim();
+    final address = profile.address.trim().isEmpty
+        ? 'No address added'
+        : profile.address.trim();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (sheetContext) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.88,
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(32),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF2563EB),
+                                Color(0xFF7C3AED),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF2563EB)
+                                    .withOpacity(0.22),
+                                blurRadius: 22,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              name.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Account Profile',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 23,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          _ProfileDetailRow(
+                            icon: Icons.person_outline,
+                            label: 'Full Name',
+                            value: name,
+                          ),
+                          _ProfileDetailRow(
+                            icon: Icons.email_outlined,
+                            label: 'Email Address',
+                            value: email,
+                          ),
+                          _ProfileDetailRow(
+                            icon: Icons.phone_outlined,
+                            label: 'Phone Number',
+                            value: phone,
+                          ),
+                          _ProfileDetailRow(
+                            icon: Icons.location_on_outlined,
+                            label: 'Address',
+                            value: address,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Color(0xFF2563EB),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'To update your profile details, open Settings and edit your profile information.',
+                              style: TextStyle(
+                                color: Color(0xFF1E3A8A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth > 520;
+
+                        final editButton = OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Open Settings → Profile to edit details.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit in Settings'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2563EB),
+                            side: const BorderSide(color: Color(0xFFBFDBFE)),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        );
+
+                        final logoutButton = ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            onLogoutTap();
+                          },
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Logout'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        );
+
+                        if (isWide) {
+                          return Row(
+                            children: [
+                              Expanded(child: editButton),
+                              const SizedBox(width: 12),
+                              Expanded(child: logoutButton),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            SizedBox(width: double.infinity, child: editButton),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: logoutButton,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileProvider>();
+    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 850;
+
+          final logo = const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Color(0x22FFFFFF),
+                child: Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Colors.white,
+                  size: 21,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Budget Home',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          );
+
+          final search = _TopSearchBox(onTap: onSearchTap);
+
+          final userArea = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ProfileAvatarButton(
+                onTap: () => _openProfileDetails(context),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Welcome back,',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _TopLogoutButton(onTap: onLogoutTap),
+            ],
+          );
+
+          if (isWide) {
+            return Row(
+              children: [
+                logo,
+                const Spacer(),
+                SizedBox(
+                  width: 360,
+                  child: search,
+                ),
+                const SizedBox(width: 18),
+                userArea,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              logo,
+              const SizedBox(height: 14),
+              search,
+              const SizedBox(height: 14),
+              userArea,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileProvider>();
+    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
+    final initial = name.substring(0, 1).toUpperCase();
+
+    return Tooltip(
+      message: 'View profile details',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF2563EB),
+                  Color(0xFF7C3AED),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.25),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2563EB).withOpacity(0.22),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileDetailRow extends StatelessWidget {
+  const _ProfileDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFEFF6FF),
+            child: Icon(
+              icon,
+              color: const Color(0xFF2563EB),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopSearchBox extends StatelessWidget {
+  const _TopSearchBox({
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.14)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: Colors.white70),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Search for transactions, reports...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.65),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopLogoutButton extends StatelessWidget {
+  const _TopLogoutButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF7F1D1D).withOpacity(0.55),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFFCA5A5).withOpacity(0.30)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.logout, color: Color(0xFFFCA5A5), size: 18),
+              SizedBox(width: 7),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  color: Color(0xFFFCA5A5),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -486,7 +1422,7 @@ class _PremiumHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(34),
+        borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2563EB).withOpacity(0.22),
@@ -496,34 +1432,36 @@ class _PremiumHeader extends StatelessWidget {
         ],
       ),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withOpacity(0.92),
-          borderRadius: BorderRadius.circular(32),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF0F172A),
+              Color(0xFF111827),
+              Color(0xFF082F49),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(34),
         ),
         child: Stack(
           children: [
             const Positioned(
               right: -80,
               top: -90,
-              child: _GlowCircle(
-                size: 220,
-                color: Color(0xFF38BDF8),
-              ),
+              child: _GlowCircle(size: 240, color: Color(0xFF38BDF8)),
             ),
             const Positioned(
               left: -90,
               bottom: -120,
-              child: _GlowCircle(
-                size: 230,
-                color: Color(0xFF8B5CF6),
-              ),
+              child: _GlowCircle(size: 240, color: Color(0xFF8B5CF6)),
             ),
             LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 820;
 
-                final left = Column(
+                final leftContent = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Wrap(
@@ -544,12 +1482,34 @@ class _PremiumHeader extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                    const Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Color(0x22FFFFFF),
+                          child: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Budget Home',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
                     Text(
                       'Welcome back, $displayName',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 32,
+                        fontSize: 36,
                         fontWeight: FontWeight.w900,
                         height: 1.05,
                       ),
@@ -560,7 +1520,7 @@ class _PremiumHeader extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -571,17 +1531,18 @@ class _PremiumHeader extends StatelessWidget {
                   ],
                 );
 
-                final right = _HeaderInsightCard(
+                final rightContent = _HeaderInsightCard(
                   currency: currency,
                   snapshot: snapshot,
                 );
 
                 if (isWide) {
                   return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Expanded(flex: 6, child: left),
-                      const SizedBox(width: 22),
-                      Expanded(flex: 4, child: right),
+                      Expanded(flex: 6, child: leftContent),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 4, child: rightContent),
                     ],
                   );
                 }
@@ -589,14 +1550,62 @@ class _PremiumHeader extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    left,
-                    const SizedBox(height: 20),
-                    right,
+                    leftContent,
+                    const SizedBox(height: 22),
+                    rightContent,
                   ],
                 );
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderQuickButton extends StatelessWidget {
+  const _HeaderQuickButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = Colors.white,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withOpacity(0.16)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -644,7 +1653,7 @@ class _NetBalanceDisplay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withOpacity(0.11),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: Colors.white.withOpacity(0.14)),
       ),
@@ -721,63 +1730,61 @@ class _HeaderInsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          border: Border.all(color: Colors.white.withOpacity(0.16)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Color(0x22FFFFFF),
-                  child: Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
-                  ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0x22FFFFFF),
+                child: Icon(
+                  Icons.auto_awesome,
+                  color: Colors.white,
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Smart Insight',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              insightText(),
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-                height: 1.45,
               ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Smart Insight',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            insightText(),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+              height: 1.45,
             ),
-            const SizedBox(height: 18),
-            _HeaderMiniMetric(
-              label: 'Total Inflow',
-              value: currency.formatAmount(snapshot.totalInflow),
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            const SizedBox(height: 10),
-            _HeaderMiniMetric(
-              label: 'Pending Commitments',
-              value: currency.formatAmount(snapshot.totalCommitments),
-              icon: Icons.pending_actions_outlined,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 18),
+          _HeaderMiniMetric(
+            label: 'Total Inflow',
+            value: currency.formatAmount(snapshot.totalInflow),
+            icon: Icons.account_balance_wallet_outlined,
+          ),
+          const SizedBox(height: 10),
+          _HeaderMiniMetric(
+            label: 'Pending Commitments',
+            value: currency.formatAmount(snapshot.totalCommitments),
+            icon: Icons.pending_actions_outlined,
+          ),
+        ],
       ),
     );
   }
@@ -2083,7 +3090,9 @@ class _RecentActivityCard extends StatelessWidget {
               amount: currency.formatAmount(recentBill.amount),
               color: const Color(0xFF2563EB),
             ),
-          if (recentExpense == null && recentIncome == null && recentBill == null)
+          if (recentExpense == null &&
+              recentIncome == null &&
+              recentBill == null)
             const _EmptyMiniState(
               icon: Icons.history_outlined,
               title: 'No activity',
@@ -2265,7 +3274,8 @@ class _StarterCard extends StatelessWidget {
                 icon: Icons.shopping_bag_outlined,
                 label: 'Add Expense',
                 color: const Color(0xFFDC2626),
-                onTap: () => onOpenRecordSection?.call(RecordSection.expenses),
+                onTap: () =>
+                    onOpenRecordSection?.call(RecordSection.expenses),
               ),
               _StarterPill(
                 icon: Icons.receipt_long_outlined,
@@ -2312,7 +3322,10 @@ class _StarterPill extends StatelessWidget {
       avatar: Icon(icon, color: color, size: 18),
       label: Text(
         label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
       ),
       backgroundColor: color.withOpacity(0.10),
       side: BorderSide(color: color.withOpacity(0.20)),
@@ -2343,7 +3356,11 @@ class _PanelCard extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: const Color(0xFF2563EB).withOpacity(0.10),
-                child: Icon(icon, color: const Color(0xFF2563EB), size: 20),
+                child: Icon(
+                  icon,
+                  color: const Color(0xFF2563EB),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -2381,7 +3398,7 @@ class _GlassCard extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
@@ -2508,6 +3525,37 @@ class _EmptyMiniState extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SearchEmptyState extends StatelessWidget {
+  const _SearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.search_off_outlined,
+              color: Color(0xFF94A3B8),
+              size: 42,
+            ),
+            SizedBox(height: 10),
+            Text(
+              'No matching feature found',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

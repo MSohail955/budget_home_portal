@@ -27,13 +27,15 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) {
+      useRootNavigator: true,
+      builder: (sheetContext) {
         return _SheetContainer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SheetTitle(
+                icon: Icons.person_outline,
                 title: 'Profile Information',
                 subtitle: 'Update your personal profile details.',
               ),
@@ -76,6 +78,9 @@ class SettingsScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   onPressed: () async {
                     final name = nameController.text.trim();
@@ -92,6 +97,15 @@ class SettingsScreen extends StatelessWidget {
                       return;
                     }
 
+                    if (!email.contains('@')) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a valid email address'),
+                        ),
+                      );
+                      return;
+                    }
+
                     await context.read<ProfileProvider>().updateProfile(
                           name: name,
                           email: email,
@@ -101,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
 
                     if (!context.mounted) return;
 
-                    Navigator.pop(context);
+                    Navigator.pop(sheetContext);
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -123,75 +137,170 @@ class SettingsScreen extends StatelessWidget {
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
 
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) {
-        return _SheetContainer(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SheetTitle(
-                title: 'Change Password',
-                subtitle: 'Update your account password securely.',
-              ),
-              const SizedBox(height: 20),
-              _AppField(
-                controller: currentPasswordController,
-                hint: 'Current password',
-                icon: Icons.lock_outline,
-                obscureText: true,
-              ),
-              const SizedBox(height: 14),
-              _AppField(
-                controller: newPasswordController,
-                hint: 'New password',
-                icon: Icons.lock_reset_outlined,
-                obscureText: true,
-              ),
-              const SizedBox(height: 14),
-              _AppField(
-                controller: confirmPasswordController,
-                hint: 'Confirm new password',
-                icon: Icons.verified_user_outlined,
-                obscureText: true,
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.password_outlined),
-                  label: const Text('Update Password'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+      useRootNavigator: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> submit() async {
+              final currentPassword = currentPasswordController.text.trim();
+              final newPassword = newPasswordController.text.trim();
+              final confirmPassword = confirmPasswordController.text.trim();
+
+              if (currentPassword.isEmpty ||
+                  newPassword.isEmpty ||
+                  confirmPassword.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please fill all password fields'),
+                  ),
+                );
+                return;
+              }
+
+              if (newPassword.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('New password must be at least 6 characters'),
+                  ),
+                );
+                return;
+              }
+
+              setSheetState(() {
+                isSubmitting = true;
+              });
+
+              final result = await context.read<AuthProvider>().changePassword(
+                    currentPassword: currentPassword,
+                    newPassword: newPassword,
+                    confirmPassword: confirmPassword,
+                  );
+
+              if (!context.mounted) return;
+
+              setSheetState(() {
+                isSubmitting = false;
+              });
+
+              Navigator.pop(sheetContext);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(result.message)),
+              );
+            }
+
+            return _SheetContainer(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SheetTitle(
+                    icon: Icons.password_outlined,
+                    title: 'Change Password',
+                    subtitle: 'Update your account password securely.',
+                  ),
+                  const SizedBox(height: 20),
+                  _AppField(
+                    controller: currentPasswordController,
+                    hint: 'Current password',
+                    icon: Icons.lock_outline,
+                    obscureText: obscureCurrent,
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          obscureCurrent = !obscureCurrent;
+                        });
+                      },
+                      icon: Icon(
+                        obscureCurrent
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
                     ),
                   ),
-                  onPressed: () async {
-                    final result =
-                        await context.read<AuthProvider>().changePassword(
-                              currentPassword: currentPasswordController.text,
-                              newPassword: newPasswordController.text,
-                              confirmPassword: confirmPasswordController.text,
-                            );
-
-                    if (!context.mounted) return;
-
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result.message)),
-                    );
-                  },
-                ),
+                  const SizedBox(height: 14),
+                  _AppField(
+                    controller: newPasswordController,
+                    hint: 'New password',
+                    icon: Icons.lock_reset_outlined,
+                    obscureText: obscureNew,
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          obscureNew = !obscureNew;
+                        });
+                      },
+                      icon: Icon(
+                        obscureNew
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _AppField(
+                    controller: confirmPasswordController,
+                    hint: 'Confirm new password',
+                    icon: Icons.verified_user_outlined,
+                    obscureText: obscureConfirm,
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          obscureConfirm = !obscureConfirm;
+                        });
+                      },
+                      icon: Icon(
+                        obscureConfirm
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      icon: isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.password_outlined),
+                      label: Text(
+                        isSubmitting ? 'Updating...' : 'Update Password',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF94A3B8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      onPressed: isSubmitting ? null : submit,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -202,6 +311,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (_) {
         return _SheetContainer(
           child: Consumer<ReminderProvider>(
@@ -211,6 +321,7 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _SheetTitle(
+                    icon: Icons.notifications_active_outlined,
                     title: 'Reminder Settings',
                     subtitle:
                         'Set smart reminders for bills, school fees, rent collection, and loans.',
@@ -324,14 +435,9 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Note: In-app reminders are configured now. Email/SMS sending needs backend integration in the next version.',
-                    style: TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
-                    ),
+                  const _InfoNotice(
+                    text:
+                        'In-app reminders are configured now. Email/SMS sending needs backend integration in the next version.',
                   ),
                 ],
               );
@@ -341,12 +447,12 @@ class SettingsScreen extends StatelessWidget {
       },
     );
   }
-
-  void openReminderContactSheet(BuildContext context) {
+    void openReminderContactSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (_) {
         return _SheetContainer(
           child: Consumer2<ProfileProvider, ReminderProvider>(
@@ -364,6 +470,7 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _SheetTitle(
+                    icon: Icons.contact_mail_outlined,
                     title: 'Reminder Contact Setup',
                     subtitle:
                         'Review the email and phone number used for future reminder delivery.',
@@ -413,6 +520,9 @@ class SettingsScreen extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -439,14 +549,9 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Note: This screen prepares reminder contact details. Actual email/SMS sending needs backend service such as SMTP, Firebase Functions, Twilio, or another provider.',
-                    style: TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
-                    ),
+                  const _InfoNotice(
+                    text:
+                        'This screen prepares reminder contact details. Actual email/SMS sending needs backend service such as SMTP, Firebase Functions, Twilio, or another provider.',
                   ),
                 ],
               );
@@ -462,6 +567,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (_) {
         return _SheetContainer(
           child: Column(
@@ -469,6 +575,7 @@ class SettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SheetTitle(
+                icon: Icons.info_outline,
                 title: 'About Budget Home Portal',
                 subtitle:
                     'A smart home finance management app for bills, rent, loans, income, expenses, reports, and reminders.',
@@ -525,6 +632,9 @@ class SettingsScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -541,7 +651,22 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Clear All Data'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFFEE2E2),
+                child: Icon(
+                  Icons.delete_sweep_outlined,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Clear All Data')),
+            ],
+          ),
           content: const Text(
             'Are you sure you want to clear all your saved finance records? This will remove your expenses, income, bills, rent, and loans for this account.',
           ),
@@ -550,7 +675,7 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
@@ -568,7 +693,8 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Clear Data'),
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Clear Data'),
             ),
           ],
         );
@@ -581,7 +707,22 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Logout'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFFEE2E2),
+                child: Icon(
+                  Icons.logout,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Logout'),
+            ],
+          ),
           content: const Text(
             'Are you sure you want to logout from this account?',
           ),
@@ -590,7 +731,7 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
@@ -603,7 +744,8 @@ class SettingsScreen extends StatelessWidget {
                 Navigator.pop(context);
                 context.go('/login');
               },
-              child: const Text('Logout'),
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
             ),
           ],
         );
@@ -616,7 +758,22 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Delete Account'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFFEE2E2),
+                child: Icon(
+                  Icons.person_remove_outlined,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Delete Account')),
+            ],
+          ),
           content: const Text(
             'Are you sure you want to delete this account? This will remove your account, profile, and all saved finance records.',
           ),
@@ -625,7 +782,7 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
@@ -646,7 +803,8 @@ class SettingsScreen extends StatelessWidget {
                   context.go('/login');
                 }
               },
-              child: const Text('Delete'),
+              icon: const Icon(Icons.person_remove_outlined),
+              label: const Text('Delete'),
             ),
           ],
         );
@@ -877,8 +1035,7 @@ class SettingsScreen extends StatelessWidget {
 
     return rows.map((row) => row.map(cleanCsvValue).join(',')).join('\n');
   }
-
-  String buildFileName(String extension) {
+    String buildFileName(String extension) {
     final now = DateTime.now();
     final date =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -1063,6 +1220,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (_) {
         return _SheetContainer(
           child: Column(
@@ -1070,6 +1228,7 @@ class SettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SheetTitle(
+                icon: Icons.backup_outlined,
                 title: 'Export Data',
                 subtitle:
                     'Download or copy your finance records, reminder settings, profile contact, and currency.',
@@ -1157,13 +1316,9 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 12),
-              Text(
-                'Tip: JSON is best for restore. CSV is best for Excel/report review and now includes reminder settings too.',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              const _InfoNotice(
+                text:
+                    'JSON is best for restore. CSV is best for Excel/report review and includes reminder settings too.',
               ),
             ],
           ),
@@ -1179,6 +1334,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (_) {
         return _SheetContainer(
           child: Column(
@@ -1186,6 +1342,7 @@ class SettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SheetTitle(
+                icon: Icons.upload_file_outlined,
                 title: 'Import JSON Backup',
                 subtitle:
                     'Select a JSON backup file or paste exported JSON below.',
@@ -1202,6 +1359,9 @@ class SettingsScreen extends StatelessWidget {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   onPressed: () => selectAndImportJsonFile(context),
@@ -1256,6 +1416,9 @@ class SettingsScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   onPressed: () async {
                     final jsonText = importController.text.trim();
@@ -1274,13 +1437,9 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                'Important: Import will replace current saved records and restore reminder settings if available.',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+              const _InfoNotice(
+                text:
+                    'Import will replace current saved records and restore reminder settings if available.',
               ),
             ],
           ),
@@ -1288,41 +1447,61 @@ class SettingsScreen extends StatelessWidget {
       },
     );
   }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final finance = context.watch<FinanceProvider>();
     final profile = context.watch<ProfileProvider>();
 
+    final totalRecords = finance.expenses.length +
+        finance.incomes.length +
+        finance.bills.length +
+        finance.rents.length +
+        finance.loans.length;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
+              constraints: const BoxConstraints(maxWidth: 1040),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const _SettingsHeader(),
                   const SizedBox(height: 22),
-                  _ProfilePreviewCard(profile: profile),
-                  const SizedBox(height: 14),
+                  _ProfilePreviewCard(
+                    profile: profile,
+                    onEditProfile: () => openProfileSheet(context),
+                    onChangePassword: () => openChangePasswordSheet(context),
+                    onLogout: () => confirmLogout(context),
+                  ),
+                  const SizedBox(height: 18),
+                  _QuickActionGrid(
+                    onProfile: () => openProfileSheet(context),
+                    onPassword: () => openChangePasswordSheet(context),
+                    onReminders: () => openReminderSettingsSheet(context),
+                    onExport: () => openExportSheet(context),
+                  ),
+                  const SizedBox(height: 18),
                   _QuickStatsCard(
-                    totalRecords: finance.expenses.length +
-                        finance.incomes.length +
-                        finance.bills.length +
-                        finance.rents.length +
-                        finance.loans.length,
+                    totalRecords: totalRecords,
                     expenses: finance.expenses.length,
                     incomes: finance.incomes.length,
                     bills: finance.bills.length,
                     rents: finance.rents.length,
                     loans: finance.loans.length,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
+
+                  const _SectionTitle(
+                    title: 'Account',
+                    subtitle: 'Manage your profile and login security.',
+                    icon: Icons.person_outline,
+                  ),
+                  const SizedBox(height: 12),
                   _SettingsCard(
                     icon: Icons.person_outline,
                     title: 'Profile Information',
@@ -1339,98 +1518,15 @@ class SettingsScreen extends StatelessWidget {
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openChangePasswordSheet(context),
                   ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 24,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor:
-                              const Color(0xFF16A34A).withOpacity(0.12),
-                          child: const Icon(
-                            Icons.currency_exchange,
-                            color: Color(0xFF16A34A),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Currency',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Default is PKR. You can change it anytime.',
-                                style: TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: currencyProvider.currencyCode,
-                              borderRadius: BorderRadius.circular(18),
-                              items: currencyProvider.availableCurrencies
-                                  .map(
-                                    (currency) => DropdownMenuItem(
-                                      value: currency,
-                                      child: Text(
-                                        currency,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value == null) return;
+                  const SizedBox(height: 22),
 
-                                currencyProvider.changeCurrency(value);
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Currency changed to $value'),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  const _SectionTitle(
+                    title: 'Preferences',
+                    subtitle: 'Set app currency and display preferences.',
+                    icon: Icons.tune_outlined,
                   ),
+                  const SizedBox(height: 12),
+                  _CurrencySettingsCard(currencyProvider: currencyProvider),
                   const SizedBox(height: 14),
                   _SettingsCard(
                     icon: Icons.dark_mode_outlined,
@@ -1451,7 +1547,14 @@ class SettingsScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
+
+                  const _SectionTitle(
+                    title: 'Reminders',
+                    subtitle: 'Configure reminders and reminder contact details.',
+                    icon: Icons.notifications_active_outlined,
+                  ),
+                  const SizedBox(height: 12),
                   _SettingsCard(
                     icon: Icons.notifications_outlined,
                     title: 'Reminder Settings',
@@ -1470,7 +1573,14 @@ class SettingsScreen extends StatelessWidget {
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openReminderContactSheet(context),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
+
+                  const _SectionTitle(
+                    title: 'Backup & Restore',
+                    subtitle: 'Export, copy, or restore your local data safely.',
+                    icon: Icons.backup_outlined,
+                  ),
+                  const SizedBox(height: 12),
                   _SettingsCard(
                     icon: Icons.backup_outlined,
                     title: 'Data Backup / Export',
@@ -1489,7 +1599,14 @@ class SettingsScreen extends StatelessWidget {
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openImportSheet(context),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
+
+                  const _SectionTitle(
+                    title: 'App Information',
+                    subtitle: 'Version, privacy note and production roadmap.',
+                    icon: Icons.info_outline,
+                  ),
+                  const SizedBox(height: 12),
                   _SettingsCard(
                     icon: Icons.info_outline,
                     title: 'About App',
@@ -1497,6 +1614,22 @@ class SettingsScreen extends StatelessWidget {
                     iconColor: const Color(0xFF0F172A),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () => openAboutAppSheet(context),
+                  ),
+                  const SizedBox(height: 22),
+
+                  const _DangerZoneTitle(),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    icon: Icons.logout,
+                    title: 'Logout',
+                    subtitle: 'Sign out from your account.',
+                    iconColor: const Color(0xFFDC2626),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Color(0xFFDC2626),
+                    ),
+                    onTap: () => confirmLogout(context),
                   ),
                   const SizedBox(height: 14),
                   _SettingsCard(
@@ -1525,19 +1658,6 @@ class SettingsScreen extends StatelessWidget {
                       color: Color(0xFFDC2626),
                     ),
                     onTap: () => confirmDeleteAccount(context),
-                  ),
-                  const SizedBox(height: 14),
-                  _SettingsCard(
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    subtitle: 'Sign out from your account.',
-                    iconColor: const Color(0xFFDC2626),
-                    trailing: const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 16,
-                      color: Color(0xFFDC2626),
-                    ),
-                    onTap: () => confirmLogout(context),
                   ),
                   const SizedBox(height: 100),
                 ],
@@ -1587,114 +1707,53 @@ class _SheetContainer extends StatelessWidget {
 
 class _SheetTitle extends StatelessWidget {
   const _SheetTitle({
+    required this.icon,
     required this.title,
     required this.subtitle,
   });
 
+  final IconData icon;
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
+        CircleAvatar(
+          radius: 26,
+          backgroundColor: const Color(0xFFEFF6FF),
+          child: Icon(
+            icon,
+            color: const Color(0xFF2563EB),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: TextStyle(color: Colors.grey.shade600),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
-    );
-  }
-}
-
-class _ProfilePreviewCard extends StatelessWidget {
-  const _ProfilePreviewCard({
-    required this.profile,
-  });
-
-  final ProfileProvider profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
-    final email =
-        profile.email.trim().isEmpty ? 'No email added' : profile.email;
-    final phone = profile.phone.trim().isEmpty ? 'No phone' : profile.phone;
-    final address =
-        profile.address.trim().isEmpty ? 'No address' : profile.address;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white.withOpacity(0.18),
-            child: Text(
-              name[0].toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$phone • $address',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1708,14 +1767,25 @@ class _SettingsHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF2563EB)],
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF2563EB),
+            Color(0xFF7C3AED),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.18),
+            blurRadius: 30,
+            offset: const Offset(0, 16),
+          ),
+        ],
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -1728,18 +1798,18 @@ class _SettingsHeader extends StatelessWidget {
               Text(
                 'Settings',
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: 34,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
               ),
               SizedBox(height: 8),
               Text(
-                'Manage currency, data, security and app preferences.',
+                'Manage account, reminders, backup, security and preferences.',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.white70,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -1771,6 +1841,435 @@ class _SettingsHeader extends StatelessWidget {
     );
   }
 }
+class _ProfilePreviewCard extends StatelessWidget {
+  const _ProfilePreviewCard({
+    required this.profile,
+    required this.onEditProfile,
+    required this.onChangePassword,
+    required this.onLogout,
+  });
+
+  final ProfileProvider profile;
+  final VoidCallback onEditProfile;
+  final VoidCallback onChangePassword;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile.name.trim().isEmpty ? 'User' : profile.name.trim();
+    final email =
+        profile.email.trim().isEmpty ? 'No email added' : profile.email.trim();
+    final phone =
+        profile.phone.trim().isEmpty ? 'No phone added' : profile.phone.trim();
+    final address = profile.address.trim().isEmpty
+        ? 'No address added'
+        : profile.address.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF111827),
+            Color(0xFF2563EB),
+            Color(0xFF7C3AED),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 720;
+
+          final profileInfo = Row(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF38BDF8),
+                      Color(0xFF8B5CF6),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.26),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    name.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ProfileMiniPill(
+                          icon: Icons.phone_outlined,
+                          label: phone,
+                        ),
+                        _ProfileMiniPill(
+                          icon: Icons.location_on_outlined,
+                          label: address,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+          final buttons = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _ProfileActionButton(
+                icon: Icons.edit_outlined,
+                label: 'Edit Profile',
+                onTap: onEditProfile,
+              ),
+              _ProfileActionButton(
+                icon: Icons.password_outlined,
+                label: 'Password',
+                onTap: onChangePassword,
+              ),
+              _ProfileActionButton(
+                icon: Icons.logout,
+                label: 'Logout',
+                color: const Color(0xFFFCA5A5),
+                onTap: onLogout,
+              ),
+            ],
+          );
+
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: profileInfo),
+                const SizedBox(width: 18),
+                buttons,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              profileInfo,
+              const SizedBox(height: 18),
+              buttons,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProfileMiniPill extends StatelessWidget {
+  const _ProfileMiniPill({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white70, size: 15),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileActionButton extends StatelessWidget {
+  const _ProfileActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = Colors.white,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.16)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionGrid extends StatelessWidget {
+  const _QuickActionGrid({
+    required this.onProfile,
+    required this.onPassword,
+    required this.onReminders,
+    required this.onExport,
+  });
+
+  final VoidCallback onProfile;
+  final VoidCallback onPassword;
+  final VoidCallback onReminders;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _QuickActionTile(
+        icon: Icons.person_outline,
+        title: 'Profile',
+        subtitle: 'Edit details',
+        color: const Color(0xFF2563EB),
+        onTap: onProfile,
+      ),
+      _QuickActionTile(
+        icon: Icons.password_outlined,
+        title: 'Password',
+        subtitle: 'Security',
+        color: const Color(0xFF7C3AED),
+        onTap: onPassword,
+      ),
+      _QuickActionTile(
+        icon: Icons.notifications_active_outlined,
+        title: 'Reminders',
+        subtitle: 'Rules',
+        color: const Color(0xFFF59E0B),
+        onTap: onReminders,
+      ),
+      _QuickActionTile(
+        icon: Icons.backup_outlined,
+        title: 'Backup',
+        subtitle: 'Export',
+        color: const Color(0xFF16A34A),
+        onTap: onExport,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 760;
+
+        if (isWide) {
+          return Row(
+            children: [
+              for (int index = 0; index < actions.length; index++) ...[
+                Expanded(child: actions[index]),
+                if (index != actions.length - 1) const SizedBox(width: 14),
+              ],
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: actions[0]),
+                const SizedBox(width: 14),
+                Expanded(child: actions[1]),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: actions[2]),
+                const SizedBox(width: 14),
+                Expanded(child: actions[3]),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuickActionTile extends StatelessWidget {
+  const _QuickActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HoverScale(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.07),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: color.withOpacity(0.12),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios, size: 14, color: color),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _QuickStatsCard extends StatelessWidget {
   const _QuickStatsCard({
@@ -1791,14 +2290,7 @@ class _QuickStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return _PremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1878,6 +2370,160 @@ class _StatsPill extends StatelessWidget {
   }
 }
 
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: const Color(0xFFEFF6FF),
+          child: Icon(
+            icon,
+            color: const Color(0xFF2563EB),
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DangerZoneTitle extends StatelessWidget {
+  const _DangerZoneTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SectionTitle(
+      title: 'Danger Zone',
+      subtitle: 'Logout, clear data, or permanently delete this account.',
+      icon: Icons.warning_amber_rounded,
+    );
+  }
+}
+
+class _CurrencySettingsCard extends StatelessWidget {
+  const _CurrencySettingsCard({
+    required this.currencyProvider,
+  });
+
+  final CurrencyProvider currencyProvider;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PremiumCard(
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: const Color(0xFF16A34A).withOpacity(0.12),
+            child: const Icon(
+              Icons.currency_exchange,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Currency',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Default is PKR. You can change it anytime.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: currencyProvider.currencyCode,
+                borderRadius: BorderRadius.circular(18),
+                items: currencyProvider.availableCurrencies
+                    .map(
+                      (currency) => DropdownMenuItem(
+                        value: currency,
+                        child: Text(
+                          currency,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+
+                  currencyProvider.changeCurrency(value);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Currency changed to $value')),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReminderContactCard extends StatelessWidget {
   const _ReminderContactCard({
     required this.icon,
@@ -1895,56 +2541,12 @@ class _ReminderContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: color.withOpacity(0.12),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _SoftInfoCard(
+      icon: icon,
+      title: title,
+      value: value,
+      subtitle: subtitle,
+      color: color,
     );
   }
 }
@@ -2011,7 +2613,6 @@ class _TestReminderPreviewCard extends StatelessWidget {
     );
   }
 }
-
 class _ReminderSwitchCard extends StatelessWidget {
   const _ReminderSwitchCard({
     required this.icon,
@@ -2031,13 +2632,8 @@ class _ReminderSwitchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return _PremiumCard(
+      backgroundColor: const Color(0xFFF8FAFC),
       child: Row(
         children: [
           CircleAvatar(
@@ -2099,13 +2695,8 @@ class _ReminderDayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return _PremiumCard(
+      backgroundColor: const Color(0xFFF8FAFC),
       child: Row(
         children: [
           CircleAvatar(
@@ -2257,13 +2848,8 @@ class _ReminderChannelPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return _PremiumCard(
+      backgroundColor: const Color(0xFFF8FAFC),
       child: Row(
         children: [
           const CircleAvatar(
@@ -2386,7 +2972,6 @@ class _ExportOptionCard extends StatelessWidget {
     );
   }
 }
-
 class _AboutInfoCard extends StatelessWidget {
   const _AboutInfoCard({
     required this.icon,
@@ -2402,14 +2987,35 @@ class _AboutInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return _SoftInfoCard(
+      icon: icon,
+      title: title,
+      value: value,
+      subtitle: '',
+      color: color,
+    );
+  }
+}
+
+class _SoftInfoCard extends StatelessWidget {
+  const _SoftInfoCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PremiumCard(
+      backgroundColor: const Color(0xFFF8FAFC),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2433,13 +3039,25 @@ class _AboutInfoCard extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
+                  style: TextStyle(
+                    color: subtitle.isEmpty ? const Color(0xFF64748B) : color,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     height: 1.45,
                   ),
                 ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -2468,55 +3086,138 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(26),
-      child: InkWell(
+    return _HoverScale(
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(26),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: iconColor.withOpacity(0.12),
-                child: Icon(icon, color: iconColor),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: iconColor.withOpacity(0.05),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
                 ),
-              ),
-              const SizedBox(width: 12),
-              trailing,
-            ],
+              ],
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: iconColor.withOpacity(0.12),
+                  child: Icon(icon, color: iconColor),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                trailing,
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PremiumCard extends StatelessWidget {
+  const _PremiumCard({
+    required this.child,
+    this.backgroundColor = Colors.white,
+  });
+
+  final Widget child;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _InfoNotice extends StatelessWidget {
+  const _InfoNotice({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline,
+            color: Color(0xFF2563EB),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2529,6 +3230,7 @@ class _AppField extends StatelessWidget {
     required this.icon,
     this.keyboardType,
     this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -2536,6 +3238,7 @@ class _AppField extends StatelessWidget {
   final IconData icon;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -2546,11 +3249,54 @@ class _AppField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverScale extends StatefulWidget {
+  const _HoverScale({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  State<_HoverScale> createState() => _HoverScaleState();
+}
+
+class _HoverScaleState extends State<_HoverScale> {
+  bool isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          isHovered = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          isHovered = false;
+        });
+      },
+      child: AnimatedScale(
+        scale: isHovered ? 1.012 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, isHovered ? -2 : 0, 0),
+          child: widget.child,
         ),
       ),
     );

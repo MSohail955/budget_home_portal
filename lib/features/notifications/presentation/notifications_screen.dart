@@ -275,7 +275,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final items = applyFilter(allItems);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -370,74 +370,274 @@ class _NotificationsHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: hasUrgent
-              ? const [Color(0xFFDC2626), Color(0xFF7F1D1D)]
-              : const [Color(0xFF2563EB), Color(0xFF7C3AED)],
+              ? const [
+                  Color(0xFFDC2626),
+                  Color(0xFF7F1D1D),
+                  Color(0xFFF59E0B),
+                ]
+              : const [
+                  Color(0xFF2563EB),
+                  Color(0xFF7C3AED),
+                  Color(0xFF06B6D4),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: (hasUrgent ? const Color(0xFFDC2626) : const Color(0xFF2563EB))
-                .withOpacity(0.22),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            color:
+                (hasUrgent ? const Color(0xFFDC2626) : const Color(0xFF2563EB))
+                    .withOpacity(0.24),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        runSpacing: 14,
-        children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Notifications',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Track bills, rent, and loans before they become late.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: hasUrgent
+                ? const [
+                    Color(0xFF450A0A),
+                    Color(0xFF7F1D1D),
+                    Color(0xFF111827),
+                  ]
+                : const [
+                    Color(0xFF0F172A),
+                    Color(0xFF111827),
+                    Color(0xFF1E1B4B),
+                  ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HeaderPill(
-                icon: Icons.notifications_active_outlined,
-                label: '$totalCount Alerts',
+          borderRadius: BorderRadius.circular(34),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -70,
+              top: -95,
+              child: _GlowCircle(
+                size: 225,
+                color: hasUrgent
+                    ? const Color(0xFFF87171)
+                    : const Color(0xFF38BDF8),
               ),
-              _HeaderPill(
-                icon: Icons.schedule_outlined,
-                label: '$dueSoonCount Due Soon',
+            ),
+            Positioned(
+              left: -95,
+              bottom: -130,
+              child: _GlowCircle(
+                size: 235,
+                color: hasUrgent
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFF8B5CF6),
               ),
-              _HeaderPill(
-                icon: Icons.warning_amber_rounded,
-                label: '$overdueCount Overdue',
-              ),
-            ],
-          ),
-        ],
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth > 760;
+
+                final titleBlock = const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 23,
+                          backgroundColor: Color(0x22FFFFFF),
+                          child: Icon(
+                            Icons.notifications_active_outlined,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Alerts Center',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Track bills, rent, and loans before they become late.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                );
+
+                final metrics = Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white.withOpacity(0.16)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Color(0x22FFFFFF),
+                            child: Icon(
+                              Icons.analytics_outlined,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Alert Summary',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _HeaderMetricRow(
+                        icon: Icons.notifications_active_outlined,
+                        label: 'Total Alerts',
+                        value: totalCount.toString(),
+                      ),
+                      const SizedBox(height: 10),
+                      _HeaderMetricRow(
+                        icon: Icons.schedule_outlined,
+                        label: 'Due Soon',
+                        value: dueSoonCount.toString(),
+                      ),
+                      const SizedBox(height: 10),
+                      _HeaderMetricRow(
+                        icon: Icons.warning_amber_rounded,
+                        label: 'Overdue',
+                        value: overdueCount.toString(),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (isWide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(flex: 6, child: titleBlock),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 4, child: metrics),
+                    ],
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: 22),
+                    metrics,
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
+class _HeaderMetricRow extends StatelessWidget {
+  const _HeaderMetricRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GlowCircle extends StatelessWidget {
+  const _GlowCircle({
+    required this.size,
+    required this.color,
+  });
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withOpacity(0.13),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _HeaderPill extends StatelessWidget {
   const _HeaderPill({
@@ -615,6 +815,13 @@ class _ReminderSettingsCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.045),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Row(
         children: [

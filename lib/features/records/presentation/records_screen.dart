@@ -35,14 +35,14 @@ class RecordsScreenState extends State<RecordsScreen> {
   void initState() {
     super.initState();
 
-    items = const [
+    items = [
       _RecordItem(
         section: RecordSection.expenses,
         title: 'Expenses',
         subtitle: 'Track groceries, bills, school fees and home costs.',
         icon: Icons.payments_outlined,
         color: Color(0xFFDC2626),
-        page: ExpensesScreen(),
+        pageBuilder: (openAddForm) => ExpensesScreen(openAddForm: openAddForm),
       ),
       _RecordItem(
         section: RecordSection.income,
@@ -50,7 +50,7 @@ class RecordsScreenState extends State<RecordsScreen> {
         subtitle: 'Manage salary, business, rent, freelance and gifts.',
         icon: Icons.trending_up_outlined,
         color: Color(0xFF16A34A),
-        page: IncomeScreen(),
+        pageBuilder: (openAddForm) => IncomeScreen(openAddForm: openAddForm),
       ),
       _RecordItem(
         section: RecordSection.rent,
@@ -58,7 +58,7 @@ class RecordsScreenState extends State<RecordsScreen> {
         subtitle: 'Monitor tenant rent, due dates and payment status.',
         icon: Icons.home_work_outlined,
         color: Color(0xFF7C3AED),
-        page: RentScreen(),
+        pageBuilder: (openAddForm) => RentScreen(openAddForm: openAddForm),
       ),
       _RecordItem(
         section: RecordSection.bills,
@@ -66,7 +66,7 @@ class RecordsScreenState extends State<RecordsScreen> {
         subtitle: 'Handle electricity, internet, water and maintenance.',
         icon: Icons.receipt_long_outlined,
         color: Color(0xFF2563EB),
-        page: BillsScreen(),
+        pageBuilder: (openAddForm) => BillsScreen(openAddForm: openAddForm),
       ),
       _RecordItem(
         section: RecordSection.loans,
@@ -74,19 +74,23 @@ class RecordsScreenState extends State<RecordsScreen> {
         subtitle: 'Track loans taken, given, pending and paid.',
         icon: Icons.handshake_outlined,
         color: Color(0xFFF59E0B),
-        page: LoansScreen(),
+        pageBuilder: (openAddForm) => LoansScreen(openAddForm: openAddForm),
       ),
     ];
   }
 
-  void openSection(RecordSection section) {
+  void openSection(
+    RecordSection section, {
+    bool openAddForm = false,
+  }) {
     final selectedItem = items.firstWhere(
       (item) => item.section == section,
     );
 
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, animation, secondaryAnimation) => selectedItem.page,
+        pageBuilder: (_, animation, secondaryAnimation) =>
+            selectedItem.pageBuilder(openAddForm),
         transitionsBuilder: (_, animation, secondaryAnimation, child) {
           final curvedAnimation = CurvedAnimation(
             parent: animation,
@@ -349,7 +353,7 @@ class _RecordItem {
     required this.subtitle,
     required this.icon,
     required this.color,
-    required this.page,
+    required this.pageBuilder,
   });
 
   final RecordSection section;
@@ -357,7 +361,7 @@ class _RecordItem {
   final String subtitle;
   final IconData icon;
   final Color color;
-  final Widget page;
+  final Widget Function(bool openAddForm) pageBuilder;
 }
 
 class _AnimatedEntry extends StatelessWidget {
@@ -740,7 +744,7 @@ class _RecordCommandCard extends StatelessWidget {
     required this.onOpenSection,
   });
 
-  final ValueChanged<RecordSection> onOpenSection;
+  final void Function(RecordSection section, {bool openAddForm}) onOpenSection;
 
   @override
   Widget build(BuildContext context) {
@@ -796,31 +800,31 @@ class _RecordCommandCard extends StatelessWidget {
                 icon: Icons.trending_up_outlined,
                 label: 'Add Income',
                 color: const Color(0xFF16A34A),
-                onTap: () => onOpenSection(RecordSection.income),
+                onTap: () => onOpenSection(RecordSection.income, openAddForm: true),
               ),
               _QuickActionPill(
                 icon: Icons.shopping_bag_outlined,
                 label: 'Add Expense',
                 color: const Color(0xFFDC2626),
-                onTap: () => onOpenSection(RecordSection.expenses),
+                onTap: () => onOpenSection(RecordSection.expenses, openAddForm: true),
               ),
               _QuickActionPill(
                 icon: Icons.receipt_long_outlined,
                 label: 'Track Bills',
                 color: const Color(0xFF2563EB),
-                onTap: () => onOpenSection(RecordSection.bills),
+                onTap: () => onOpenSection(RecordSection.bills, openAddForm: true),
               ),
               _QuickActionPill(
                 icon: Icons.home_work_outlined,
                 label: 'Track Rent',
                 color: const Color(0xFF7C3AED),
-                onTap: () => onOpenSection(RecordSection.rent),
+                onTap: () => onOpenSection(RecordSection.rent, openAddForm: true),
               ),
               _QuickActionPill(
                 icon: Icons.handshake_outlined,
                 label: 'Track Loans',
                 color: const Color(0xFFF59E0B),
-                onTap: () => onOpenSection(RecordSection.loans),
+                onTap: () => onOpenSection(RecordSection.loans, openAddForm: true),
               ),
             ],
           );

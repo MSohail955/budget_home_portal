@@ -16,7 +16,12 @@ enum LoanStatusFilter {
 }
 
 class LoansScreen extends StatefulWidget {
-  const LoansScreen({super.key});
+  const LoansScreen({
+    super.key,
+    this.openAddForm = false,
+  });
+
+  final bool openAddForm;
 
   @override
   State<LoansScreen> createState() => _LoansScreenState();
@@ -541,6 +546,19 @@ class _LoansScreenState extends State<LoansScreen> {
         );
       },
     );
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.openAddForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openLoanSheet();
+      });
+    }
   }
 
   @override

@@ -5,7 +5,12 @@ import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 
 class IncomeScreen extends StatefulWidget {
-  const IncomeScreen({super.key});
+  const IncomeScreen({
+    super.key,
+    this.openAddForm = false,
+  });
+
+  final bool openAddForm;
 
   @override
   State<IncomeScreen> createState() => _IncomeScreenState();
@@ -403,6 +408,19 @@ class _IncomeScreenState extends State<IncomeScreen> {
         );
       },
     );
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.openAddForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openIncomeSheet();
+      });
+    }
   }
 
   @override

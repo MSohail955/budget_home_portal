@@ -14,7 +14,12 @@ enum BillStatusFilter {
 }
 
 class BillsScreen extends StatefulWidget {
-  const BillsScreen({super.key});
+  const BillsScreen({
+    super.key,
+    this.openAddForm = false,
+  });
+
+  final bool openAddForm;
 
   @override
   State<BillsScreen> createState() => _BillsScreenState();
@@ -551,6 +556,19 @@ class _BillsScreenState extends State<BillsScreen> {
         );
       },
     );
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.openAddForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openBillSheet();
+      });
+    }
   }
 
   @override

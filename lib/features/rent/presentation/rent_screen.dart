@@ -14,7 +14,12 @@ enum RentStatusFilter {
 }
 
 class RentScreen extends StatefulWidget {
-  const RentScreen({super.key});
+  const RentScreen({
+    super.key,
+    this.openAddForm = false,
+  });
+
+  final bool openAddForm;
 
   @override
   State<RentScreen> createState() => _RentScreenState();
@@ -640,6 +645,19 @@ class _RentScreenState extends State<RentScreen> {
         );
       },
     );
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.openAddForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openRentSheet();
+      });
+    }
   }
 
   @override

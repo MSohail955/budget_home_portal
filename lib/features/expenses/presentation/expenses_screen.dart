@@ -7,7 +7,12 @@ import '../../../core/providers/currency_provider.dart';
 import '../../../core/providers/finance_provider.dart';
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+  const ExpensesScreen({
+    super.key,
+    this.openAddForm = false,
+  });
+
+  final bool openAddForm;
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -450,6 +455,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         );
       },
     );
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.openAddForm) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openExpenseSheet();
+      });
+    }
   }
 
   @override

@@ -230,7 +230,7 @@ class ReportsScreen extends StatelessWidget {
     final hasAnyRecords = snapshot.totalRecords > 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -437,23 +437,42 @@ class _ReportsHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF7C3AED)],
+          colors: [
+            Color(0xFF2563EB),
+            Color(0xFF7C3AED),
+            Color(0xFF06B6D4),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(34),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withOpacity(0.22),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            color: const Color(0xFF7C3AED).withOpacity(0.24),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
           ),
         ],
       ),
-      child: Wrap(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF0F172A),
+              Color(0xFF111827),
+              Color(0xFF581C87),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(32),
+        ),
+        child: Wrap(
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         runSpacing: 14,
@@ -506,6 +525,7 @@ class _ReportsHeader extends StatelessWidget {
             ],
           ),
         ],
+        ),
       ),
     );
   }
@@ -856,6 +876,13 @@ class _ReportsEmptyState extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.045),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -905,6 +932,13 @@ class _ReportSummaryCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

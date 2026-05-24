@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
@@ -157,8 +158,47 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     });
   }
 
+
+  String? requiredTextValidator(String? value, String label) {
+    if (value == null || value.trim().isEmpty) {
+      return '$label is required';
+    }
+
+    if (value.trim().length < 2) {
+      return '$label must be at least 2 characters';
+    }
+
+    return null;
+  }
+
+  String? amountValidator(String? value) {
+    final cleanValue = value?.trim() ?? '';
+
+    if (cleanValue.isEmpty) {
+      return 'Amount is required';
+    }
+
+    final amount = double.tryParse(cleanValue);
+
+    if (amount == null) {
+      return 'Enter a valid amount';
+    }
+
+    if (amount <= 0) {
+      return 'Amount must be greater than 0';
+    }
+
+    if (amount > 999999999) {
+      return 'Amount is too large';
+    }
+
+    return null;
+  }
+
   void openExpenseSheet({ExpenseRecord? existingExpense}) {
     final isEdit = existingExpense != null;
+    final formKey = GlobalKey<FormState>();
+    var autoValidateMode = AutovalidateMode.disabled;
 
     final titleController = TextEditingController(
       text: existingExpense?.title ?? '',
@@ -1935,18 +1975,27 @@ class _AppField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.keyboardType,
+    this.validator,
+    this.inputFormatters,
+    this.textInputAction,
   });
 
   final TextEditingController controller;
   final String hint;
   final IconData icon;
   final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextInputAction? textInputAction;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      validator: validator,
+      inputFormatters: inputFormatters,
+      textInputAction: textInputAction,
       decoration: _inputDecoration(hint, icon),
     );
   }
@@ -1958,9 +2007,39 @@ InputDecoration _inputDecoration(String hint, IconData icon) {
     prefixIcon: Icon(icon),
     filled: true,
     fillColor: const Color(0xFFF8FAFC),
+    errorMaxLines: 2,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 16,
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 1.4,
+      ),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 1.2,
+      ),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 1.4,
+      ),
     ),
   );
 }

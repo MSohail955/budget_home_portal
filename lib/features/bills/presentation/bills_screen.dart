@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/currency_provider.dart';
@@ -250,9 +251,48 @@ class _BillsScreenState extends State<BillsScreen> {
     onPicked(pickedDate);
   }
 
+
+  String? requiredTextValidator(String? value, String label) {
+    if (value == null || value.trim().isEmpty) {
+      return '$label is required';
+    }
+
+    if (value.trim().length < 2) {
+      return '$label must be at least 2 characters';
+    }
+
+    return null;
+  }
+
+  String? amountValidator(String? value) {
+    final cleanValue = value?.trim() ?? '';
+
+    if (cleanValue.isEmpty) {
+      return 'Amount is required';
+    }
+
+    final amount = double.tryParse(cleanValue);
+
+    if (amount == null) {
+      return 'Enter a valid amount';
+    }
+
+    if (amount <= 0) {
+      return 'Amount must be greater than 0';
+    }
+
+    if (amount > 999999999) {
+      return 'Amount is too large';
+    }
+
+    return null;
+  }
+
   void openBillSheet({BillRecord? existingBill}) {
     final reminder = context.read<ReminderProvider>();
     final isEdit = existingBill != null;
+    final formKey = GlobalKey<FormState>();
+    var autoValidateMode = AutovalidateMode.disabled;
 
     final titleController = TextEditingController(
       text: existingBill?.title ?? '',
@@ -313,7 +353,10 @@ class _BillsScreenState extends State<BillsScreen> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 700),
-                    child: Column(
+                    child: Form(
+                      key: formKey,
+                      autovalidateMode: autoValidateMode,
+                      child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -337,13 +380,25 @@ class _BillsScreenState extends State<BillsScreen> {
                           controller: titleController,
                           hint: 'Bill title',
                           icon: Icons.receipt_long_outlined,
+                          validator: (value) =>
+                              requiredTextValidator(value, 'Bill title'),
+                          textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 14),
                         _AppField(
                           controller: amountController,
                           hint: 'Amount',
                           icon: Icons.payments_outlined,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: amountValidator,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\\d*\\.?\\d{0,2}'),
+                            ),
+                          ],
+                          textInputAction: TextInputAction.done,
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
@@ -358,6 +413,13 @@ class _BillsScreenState extends State<BillsScreen> {
                               child: Text(item),
                             );
                           }).toList(),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Category is required';
+                            }
+
+                            return null;
+                          },
                           onChanged: (value) {
                             if (value == null) return;
 
@@ -444,19 +506,26 @@ class _BillsScreenState extends State<BillsScreen> {
                               ),
                             ),
                             onPressed: () {
-                              final title = titleController.text.trim();
-                              final amount =
-                                  double.tryParse(amountController.text.trim()) ??
-                                      0;
+                              FocusScope.of(context).unfocus();
 
-                              if (title.isEmpty || amount <= 0) {
+                              setSheetState(() {
+                                autoValidateMode =
+                                    AutovalidateMode.onUserInteraction;
+                              });
+
+                              if (!(formKey.currentState?.validate() ?? false)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Please enter valid bill data'),
+                                    content:
+                                        Text('Please fix the highlighted fields'),
                                   ),
                                 );
                                 return;
                               }
+
+                              final title = titleController.text.trim();
+                              final amount =
+                                  double.parse(amountController.text.trim());
 
                               final newRecord = BillRecord(
                                 title: title,
@@ -500,6 +569,7 @@ class _BillsScreenState extends State<BillsScreen> {
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ),
@@ -1588,18 +1658,27 @@ class _AppField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.keyboardType,
+    this.validator,
+    this.inputFormatters,
+    this.textInputAction,
   });
 
   final TextEditingController controller;
   final String hint;
   final IconData icon;
   final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextInputAction? textInputAction;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      validator: validator,
+      inputFormatters: inputFormatters,
+      textInputAction: textInputAction,
       decoration: _inputDecoration(hint, icon),
     );
   }
@@ -1611,9 +1690,39 @@ InputDecoration _inputDecoration(String hint, IconData icon) {
     prefixIcon: Icon(icon),
     filled: true,
     fillColor: const Color(0xFFF8FAFC),
+    errorMaxLines: 2,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 16,
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFF2563EB),
+        width: 1.4,
+      ),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 1.2,
+      ),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 1.4,
+      ),
     ),
   );
 }

@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class FinanceProvider extends ChangeNotifier {
+  static const String baseUrl = 'http://localhost:5168/api';
+  static const String _authTokenKey = 'budget_home_auth_token';
+
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   String? _currentUserId;
@@ -20,6 +25,127 @@ class FinanceProvider extends ChangeNotifier {
     }
 
     return 'finance_records_data_$_currentUserId';
+  }
+
+
+  Future<String?> _readToken() async {
+    try {
+      final token = await _storage.read(key: _authTokenKey);
+      if (token == null || token.trim().isEmpty) return null;
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<dynamic> _apiRequest({
+    required String method,
+    required String path,
+    Map<String, dynamic>? body,
+  }) async {
+    final token = await _readToken();
+
+    if (token == null) {
+      return null;
+    }
+
+    final completer = Completer<dynamic>();
+    final request = html.HttpRequest();
+
+    void completeFromResponse() {
+      final statusCode = request.status ?? 0;
+      final responseText = request.responseText ?? '';
+      final isSuccess = statusCode >= 200 && statusCode < 300;
+
+      if (!isSuccess) {
+        completer.complete(null);
+        return;
+      }
+
+      if (responseText.trim().isEmpty) {
+        completer.complete(true);
+        return;
+      }
+
+      try {
+        completer.complete(jsonDecode(responseText));
+      } catch (_) {
+        completer.complete(responseText);
+      }
+    }
+
+    try {
+      request.open(method, '$baseUrl$path');
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.setRequestHeader('Authorization', 'Bearer $token');
+
+      request.onLoadEnd.listen((_) {
+        if (!completer.isCompleted) {
+          completeFromResponse();
+        }
+      });
+
+      request.onError.listen((_) {
+        if (!completer.isCompleted) {
+          completer.complete(null);
+        }
+      });
+
+      request.onTimeout.listen((_) {
+        if (!completer.isCompleted) {
+          completer.complete(null);
+        }
+      });
+
+      request.timeout = 15000;
+      request.send(body == null ? null : jsonEncode(body));
+
+      return completer.future;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<dynamic> _extractList(dynamic response) {
+    if (response is List) return response;
+
+    if (response is Map<String, dynamic>) {
+      final data = response['data'] ?? response['items'] ?? response['result'];
+
+      if (data is List) return data;
+    }
+
+    return [];
+  }
+
+  Map<String, dynamic>? _extractMap(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      final data = response['data'] ?? response['item'] ?? response['result'];
+
+      if (data is Map<String, dynamic>) return data;
+
+      return response;
+    }
+
+    return null;
+  }
+
+  Future<void> loadIncomeFromApi() async {
+    final response = await _apiRequest(
+      method: 'GET',
+      path: '/income',
+    );
+
+    final items = _extractList(response);
+
+    if (items.isEmpty && response == null) return;
+
+    incomes
+      ..clear()
+      ..addAll(items.map((item) => IncomeRecord.fromJson(item)));
+
+    notifyListeners();
+    await _saveAll();
   }
 
   void setUserId(String? userId) {
@@ -134,6 +260,7 @@ class FinanceProvider extends ChangeNotifier {
         _clearMemoryOnly();
         await _saveAll();
         notifyListeners();
+        await loadIncomeFromApi();
         return;
       }
 
@@ -175,6 +302,7 @@ class FinanceProvider extends ChangeNotifier {
         );
 
       notifyListeners();
+      await loadIncomeFromApi();
     } catch (_) {
       _clearMemoryOnly();
       await _saveAll();
@@ -227,28 +355,72 @@ class FinanceProvider extends ChangeNotifier {
     _saveAll();
   }
 
-  void addIncome(IncomeRecord record) {
+  Future<void> addIncome(IncomeRecord record) async {
     incomes.insert(0, record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    final response = await _apiRequest(
+      method: 'POST',
+      path: '/income',
+      body: record.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    final savedRecord = IncomeRecord.fromJson(savedMap);
+    final index = incomes.indexOf(record);
+
+    if (index != -1) {
+      incomes[index] = savedRecord;
+      notifyListeners();
+      await _saveAll();
+    }
   }
 
-  void updateIncome({
+  Future<void> updateIncome({
     required IncomeRecord oldRecord,
     required IncomeRecord newRecord,
-  }) {
+  }) async {
     final index = incomes.indexOf(oldRecord);
     if (index == -1) return;
 
-    incomes[index] = newRecord;
+    final recordToSave = newRecord.copyWith(id: oldRecord.id);
+
+    incomes[index] = recordToSave;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (oldRecord.id == null || oldRecord.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PUT',
+      path: '/income/${oldRecord.id}',
+      body: recordToSave.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    incomes[index] = IncomeRecord.fromJson(savedMap);
+    notifyListeners();
+    await _saveAll();
   }
 
-  void deleteIncome(IncomeRecord record) {
+  Future<void> deleteIncome(IncomeRecord record) async {
     incomes.remove(record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    await _apiRequest(
+      method: 'DELETE',
+      path: '/income/${record.id}',
+    );
   }
 
   void addBill(BillRecord record) {
@@ -459,6 +631,7 @@ class ExpenseRecord {
 
 class IncomeRecord {
   IncomeRecord({
+    this.id,
     required this.title,
     required this.source,
     required this.category,
@@ -466,25 +639,59 @@ class IncomeRecord {
     required this.date,
   });
 
+  final String? id;
   final String title;
   final String source;
   final String category;
   final double amount;
   final String date;
 
+  IncomeRecord copyWith({
+    String? id,
+    String? title,
+    String? source,
+    String? category,
+    double? amount,
+    String? date,
+  }) {
+    return IncomeRecord(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      source: source ?? this.source,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+    );
+  }
+
   factory IncomeRecord.fromJson(dynamic json) {
     final map = Map<String, dynamic>.from(json as Map);
 
     return IncomeRecord(
-      title: map['title']?.toString() ?? '',
+      id: map['id']?.toString() ?? map['incomeId']?.toString(),
+      title: map['title']?.toString() ?? map['name']?.toString() ?? '',
       source: map['source']?.toString() ?? '',
       category: map['category']?.toString() ?? 'Other',
       amount: double.tryParse(map['amount'].toString()) ?? 0,
-      date: map['date']?.toString() ?? '',
+      date: map['date']?.toString() ??
+          map['incomeDate']?.toString() ??
+          map['createdAt']?.toString() ??
+          '',
     );
   }
 
   Map<String, dynamic> toJson() {
+    return {
+      if (id != null && id!.isNotEmpty) 'id': id,
+      'title': title,
+      'source': source,
+      'category': category,
+      'amount': amount,
+      'date': date,
+    };
+  }
+
+  Map<String, dynamic> toApiJson() {
     return {
       'title': title,
       'source': source,

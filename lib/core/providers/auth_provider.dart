@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,67 +10,247 @@ class AuthProvider extends ChangeNotifier {
     loadCurrentUser();
   }
 
-  static const String _usersKey = 'budget_home_users';
+  static const String baseUrl = 'http://localhost:5168/api';
+
   static const String _currentUserKey = 'budget_home_current_user';
+  static const String _authTokenKey = 'budget_home_auth_token';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   AppUser? _currentUser;
+  String? _token;
   bool _isLoading = true;
 
   AppUser? get currentUser => _currentUser;
+  String? get token => _token;
   bool get isLoading => _isLoading;
-  bool get isLoggedIn => _currentUser != null;
+  bool get isLoggedIn => _currentUser != null && (_token?.isNotEmpty ?? false);
   String? get currentUserId => _currentUser?.id;
 
-  String _hashPassword(String password) {
-    final normalized = password.trim();
-    final bytes = utf8.encode('budget_home_local_salt::$normalized');
-    return base64Url.encode(bytes);
+  Map<String, String> get authorizedHeaders {
+    return {
+      'Content-Type': 'application/json',
+      if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+    };
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final completer = Completer<Map<String, dynamic>>();
+    final request = html.HttpRequest();
+
+    void completeFromResponse() {
+      final statusCode = request.status ?? 0;
+      final responseText = request.responseText ?? '';
+      final isSuccess = statusCode >= 200 && statusCode < 300;
+
+      if (responseText.trim().isEmpty) {
+        completer.complete({
+          'success': isSuccess,
+          'statusCode': statusCode,
+          'message': isSuccess
+              ? 'Request completed successfully'
+              : _friendlyHttpMessage(statusCode),
+        });
+        return;
+      }
+
+      try {
+        final decoded = jsonDecode(responseText);
+
+        if (decoded is Map<String, dynamic>) {
+          completer.complete({
+            ...decoded,
+            'success': isSuccess,
+            'statusCode': statusCode,
+            if (!decoded.containsKey('message') && !isSuccess)
+              'message': _friendlyHttpMessage(statusCode),
+          });
+          return;
+        }
+
+        completer.complete({
+          'success': isSuccess,
+          'statusCode': statusCode,
+          'message': decoded.toString(),
+        });
+      } catch (_) {
+        completer.complete({
+          'success': isSuccess,
+          'statusCode': statusCode,
+          'message': responseText.trim().isNotEmpty
+              ? responseText
+              : _friendlyHttpMessage(statusCode),
+        });
+      }
+    }
+
+    try {
+      request.open('POST', '$baseUrl$path');
+      request.setRequestHeader('Content-Type', 'application/json');
+
+      request.onLoadEnd.listen((_) {
+        if (!completer.isCompleted) {
+          completeFromResponse();
+        }
+      });
+
+      request.onError.listen((_) {
+        if (!completer.isCompleted) {
+          completer.complete({
+            'success': false,
+            'statusCode': 0,
+            'message':
+                'Cannot reach the server. Please make sure the backend API is running and CORS is enabled.',
+          });
+        }
+      });
+
+      request.onTimeout.listen((_) {
+        if (!completer.isCompleted) {
+          completer.complete({
+            'success': false,
+            'statusCode': 0,
+            'message': 'Server request timed out. Please try again.',
+          });
+        }
+      });
+
+      request.timeout = 15000;
+      request.send(jsonEncode(body));
+
+      return completer.future;
+    } catch (_) {
+      return {
+        'success': false,
+        'statusCode': 0,
+        'message':
+            'Cannot reach the server. Please make sure the backend API is running and CORS is enabled.',
+      };
+    }
+  }
+
+  String _friendlyHttpMessage(int statusCode) {
+    switch (statusCode) {
+      case 400:
+        return 'Please check the submitted information and try again.';
+      case 401:
+        return 'Incorrect email or password. Please check your login details.';
+      case 403:
+        return 'You do not have permission to perform this action.';
+      case 404:
+        return 'Requested API endpoint was not found.';
+      case 409:
+        return 'This record already exists.';
+      case 500:
+        return 'Server error. Please try again later.';
+      default:
+        return 'Request failed. Please try again.';
+    }
+  }
+
+  String _extractMessage(Map<String, dynamic> response, String fallback) {
+    final message = response['message'] ??
+        response['title'] ??
+        response['error'] ??
+        response['errors'];
+
+    if (message == null) return fallback;
+
+    if (message is String) return message;
+
+    return message.toString();
+  }
+
+  AppUser _userFromBackend(Map<String, dynamic> data) {
+    final userMap = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : data;
+
+    final firstName = userMap['firstName']?.toString() ?? '';
+    final lastName = userMap['lastName']?.toString() ?? '';
+    final backendName = userMap['name']?.toString();
+
+    final fullName = backendName?.trim().isNotEmpty == true
+        ? backendName!.trim()
+        : '$firstName $lastName'.trim();
+
+    return AppUser(
+      id: userMap['id']?.toString() ?? '',
+      name: fullName.isEmpty ? 'User' : fullName,
+      email: userMap['email']?.toString() ?? '',
+      passwordHash: '',
+      createdAt: userMap['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+    );
   }
 
   Future<void> loadCurrentUser() async {
     try {
       final currentUserJson = await _storage.read(key: _currentUserKey);
+      final savedToken = await _storage.read(key: _authTokenKey);
 
-      if (currentUserJson != null && currentUserJson.trim().isNotEmpty) {
+      if (currentUserJson != null &&
+          currentUserJson.trim().isNotEmpty &&
+          savedToken != null &&
+          savedToken.trim().isNotEmpty) {
         _currentUser = AppUser.fromJson(jsonDecode(currentUserJson));
+        _token = savedToken;
       }
     } catch (_) {
       _currentUser = null;
+      _token = null;
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<List<AppUser>> _loadUsers() async {
-    try {
-      final usersJson = await _storage.read(key: _usersKey);
-
-      if (usersJson == null || usersJson.trim().isEmpty) {
-        return [];
-      }
-
-      final decoded = jsonDecode(usersJson) as List;
-
-      return decoded.map((item) => AppUser.fromJson(item)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  Future<void> _saveUsers(List<AppUser> users) async {
-    await _storage.write(
-      key: _usersKey,
-      value: jsonEncode(users.map((item) => item.toJson()).toList()),
-    );
-  }
-
-  Future<void> _saveCurrentUser(AppUser user) async {
+  Future<void> _saveSession({
+    required AppUser user,
+    required String token,
+  }) async {
     await _storage.write(
       key: _currentUserKey,
       value: jsonEncode(user.toJson()),
+    );
+
+    await _storage.write(
+      key: _authTokenKey,
+      value: token,
+    );
+
+    _currentUser = user;
+    _token = token;
+    notifyListeners();
+  }
+
+  Future<AuthResult> sendRegistrationOtp({
+    required String email,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+      return AuthResult(
+        success: false,
+        message: 'Please enter a valid email address',
+      );
+    }
+
+    final response = await _postJson(
+      '/Auth/send-registration-otp',
+      {'email': cleanEmail},
+    );
+
+    final success = response['success'] == true;
+
+    return AuthResult(
+      success: success,
+      message: _extractMessage(
+        response,
+        success ? 'Registration OTP sent successfully' : 'Unable to send OTP',
+      ),
     );
   }
 
@@ -76,10 +258,13 @@ class AuthProvider extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    String? confirmPassword,
+    String? otp,
   }) async {
     final cleanName = name.trim();
     final cleanEmail = email.trim().toLowerCase();
     final cleanPassword = password.trim();
+    final cleanConfirmPassword = (confirmPassword ?? password).trim();
 
     if (cleanName.isEmpty || cleanEmail.isEmpty || cleanPassword.isEmpty) {
       return AuthResult(
@@ -102,38 +287,51 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    final users = await _loadUsers();
-
-    final alreadyExists = users.any(
-      (item) => item.email.toLowerCase() == cleanEmail,
-    );
-
-    if (alreadyExists) {
+    if (cleanPassword != cleanConfirmPassword) {
       return AuthResult(
         success: false,
-        message: 'This email is already registered',
+        message: 'Password and confirm password do not match',
       );
     }
 
-    final newUser = AppUser(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: cleanName,
-      email: cleanEmail,
-      passwordHash: _hashPassword(cleanPassword),
-      createdAt: DateTime.now().toIso8601String(),
+    final nameParts = cleanName.split(RegExp(r'\s+'));
+    final firstName = nameParts.isEmpty ? cleanName : nameParts.first;
+    final lastName = nameParts.length > 1 ? nameParts.skip(1).join(' ') : '';
+
+    final response = await _postJson(
+      '/Auth/register',
+      {
+        'name': cleanName,
+        'firstName': firstName,
+        'lastName': lastName,
+        'email': cleanEmail,
+        'password': cleanPassword,
+        'confirmPassword': cleanConfirmPassword,
+        if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
+      },
     );
 
-    users.add(newUser);
+    final success = response['success'] == true;
 
-    await _saveUsers(users);
-    await _saveCurrentUser(newUser);
+    if (!success) {
+      return AuthResult(
+        success: false,
+        message: _extractMessage(response, 'Unable to create account'),
+      );
+    }
 
-    _currentUser = newUser;
-    notifyListeners();
+    final token = response['token']?.toString();
+
+    if (token != null && token.isNotEmpty) {
+      await _saveSession(
+        user: _userFromBackend(response),
+        token: token,
+      );
+    }
 
     return AuthResult(
       success: true,
-      message: 'Account created successfully',
+      message: _extractMessage(response, 'Account created successfully'),
     );
   }
 
@@ -151,28 +349,35 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    final users = await _loadUsers();
-    final passwordHash = _hashPassword(cleanPassword);
-
-    final matchedUsers = users.where(
-      (item) =>
-          item.email.toLowerCase() == cleanEmail &&
-          item.passwordHash == passwordHash,
+    final response = await _postJson(
+      '/Auth/login',
+      {
+        'email': cleanEmail,
+        'password': cleanPassword,
+      },
     );
 
-    if (matchedUsers.isEmpty) {
+    final success = response['success'] == true;
+    final token = response['token']?.toString();
+
+    if (!success || token == null || token.isEmpty) {
+      final statusCode = response['statusCode'];
+
       return AuthResult(
         success: false,
-        message: 'Invalid email or password',
+        message: statusCode == 400 || statusCode == 401
+            ? 'Incorrect email or password. Please check your login details and try again.'
+            : _extractMessage(
+                response,
+                'Unable to login right now. Please try again.',
+              ),
       );
     }
 
-    final user = matchedUsers.first;
-
-    await _saveCurrentUser(user);
-
-    _currentUser = user;
-    notifyListeners();
+    await _saveSession(
+      user: _userFromBackend(response),
+      token: token,
+    );
 
     return AuthResult(
       success: true,
@@ -180,10 +385,39 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
+  Future<AuthResult> sendForgotPasswordOtp({
+    required String email,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+
+    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
+      return AuthResult(
+        success: false,
+        message: 'Please enter a valid email address',
+      );
+    }
+
+    final response = await _postJson(
+      '/Auth/send-forgot-password-otp',
+      {'email': cleanEmail},
+    );
+
+    final success = response['success'] == true;
+
+    return AuthResult(
+      success: success,
+      message: _extractMessage(
+        response,
+        success ? 'Password reset OTP sent successfully' : 'Unable to send OTP',
+      ),
+    );
+  }
+
   Future<AuthResult> resetPassword({
     required String email,
     required String newPassword,
     required String confirmPassword,
+    String? otp,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanNewPassword = newPassword.trim();
@@ -219,45 +453,25 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    try {
-      final users = await _loadUsers();
-      final index = users.indexWhere(
-        (item) => item.email.toLowerCase() == cleanEmail,
-      );
+    final response = await _postJson(
+      '/Auth/reset-password',
+      {
+        'email': cleanEmail,
+        'newPassword': cleanNewPassword,
+        'confirmPassword': cleanConfirmPassword,
+        if (otp != null && otp.trim().isNotEmpty) 'otp': otp.trim(),
+      },
+    );
 
-      if (index == -1) {
-        return AuthResult(
-          success: false,
-          message: 'No account found with this email',
-        );
-      }
+    final success = response['success'] == true;
 
-      final user = users[index];
-
-      final updatedUser = user.copyWith(
-        passwordHash: _hashPassword(cleanNewPassword),
-      );
-
-      users[index] = updatedUser;
-
-      await _saveUsers(users);
-
-      if (_currentUser?.id == updatedUser.id) {
-        _currentUser = updatedUser;
-        await _saveCurrentUser(updatedUser);
-        notifyListeners();
-      }
-
-      return AuthResult(
-        success: true,
-        message: 'Password reset successfully. You can login now.',
-      );
-    } catch (_) {
-      return AuthResult(
-        success: false,
-        message: 'Unable to reset password',
-      );
-    }
+    return AuthResult(
+      success: success,
+      message: _extractMessage(
+        response,
+        success ? 'Password reset successfully. You can login now.' : 'Unable to reset password',
+      ),
+    );
   }
 
   Future<AuthResult> changePassword({
@@ -274,23 +488,15 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    final cleanCurrentPassword = currentPassword.trim();
     final cleanNewPassword = newPassword.trim();
     final cleanConfirmPassword = confirmPassword.trim();
 
-    if (cleanCurrentPassword.isEmpty ||
+    if (currentPassword.trim().isEmpty ||
         cleanNewPassword.isEmpty ||
         cleanConfirmPassword.isEmpty) {
       return AuthResult(
         success: false,
         message: 'Please fill all password fields',
-      );
-    }
-
-    if (_hashPassword(cleanCurrentPassword) != user.passwordHash) {
-      return AuthResult(
-        success: false,
-        message: 'Current password is incorrect',
       );
     }
 
@@ -308,52 +514,21 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    if (_hashPassword(cleanNewPassword) == user.passwordHash) {
-      return AuthResult(
-        success: false,
-        message: 'New password must be different from current password',
-      );
-    }
-
-    try {
-      final users = await _loadUsers();
-      final index = users.indexWhere((item) => item.id == user.id);
-
-      if (index == -1) {
-        return AuthResult(
-          success: false,
-          message: 'User account not found',
-        );
-      }
-
-      final updatedUser = user.copyWith(
-        passwordHash: _hashPassword(cleanNewPassword),
-      );
-
-      users[index] = updatedUser;
-
-      await _saveUsers(users);
-      await _saveCurrentUser(updatedUser);
-
-      _currentUser = updatedUser;
-      notifyListeners();
-
-      return AuthResult(
-        success: true,
-        message: 'Password changed successfully',
-      );
-    } catch (_) {
-      return AuthResult(
-        success: false,
-        message: 'Unable to change password',
-      );
-    }
+    // Backend currently exposes reset-password/forgot-password but not a visible
+    // change-password endpoint in Swagger. Keep this safe frontend response.
+    return AuthResult(
+      success: false,
+      message:
+          'Change password API is not available yet. Use Forgot Password from login screen.',
+    );
   }
 
   Future<void> logout() async {
     await _storage.delete(key: _currentUserKey);
+    await _storage.delete(key: _authTokenKey);
 
     _currentUser = null;
+    _token = null;
     notifyListeners();
   }
 
@@ -367,30 +542,21 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    try {
-      final users = await _loadUsers();
+    await _storage.delete(key: _currentUserKey);
+    await _storage.delete(key: _authTokenKey);
+    await _storage.delete(key: 'finance_records_data_${user.id}');
+    await _storage.delete(key: 'user_profile_data_${user.id}');
+    await _storage.delete(key: 'currency_settings_${user.id}');
 
-      users.removeWhere((item) => item.id == user.id);
+    _currentUser = null;
+    _token = null;
+    notifyListeners();
 
-      await _saveUsers(users);
-      await _storage.delete(key: _currentUserKey);
-      await _storage.delete(key: 'finance_records_data_${user.id}');
-      await _storage.delete(key: 'user_profile_data_${user.id}');
-      await _storage.delete(key: 'currency_settings_${user.id}');
-
-      _currentUser = null;
-      notifyListeners();
-
-      return AuthResult(
-        success: true,
-        message: 'Account deleted successfully',
-      );
-    } catch (_) {
-      return AuthResult(
-        success: false,
-        message: 'Unable to delete account',
-      );
-    }
+    return AuthResult(
+      success: true,
+      message:
+          'Local session deleted. Backend delete account API is not available yet.',
+    );
   }
 }
 

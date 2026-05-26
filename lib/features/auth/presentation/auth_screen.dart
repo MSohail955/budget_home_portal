@@ -76,6 +76,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void openForgotPasswordSheet() {
     final resetEmailController = TextEditingController(text: emailController.text);
+    final otpController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
 
@@ -115,7 +116,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Enter your account email and create a new password.',
+                      'Enter your account email, OTP if required, and create a new password.',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 20),
@@ -124,6 +125,13 @@ class _AuthScreenState extends State<AuthScreen> {
                       hint: 'Registered email address',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 14),
+                    _AuthField(
+                      controller: otpController,
+                      hint: 'OTP code if required by backend',
+                      icon: Icons.pin_outlined,
+                      keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 14),
                     TextField(
@@ -164,6 +172,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     newPassword: newPasswordController.text,
                                     confirmPassword:
                                         confirmPasswordController.text,
+                                    otp: otpController.text,
                                   );
 
                           if (!mounted) return;
@@ -187,7 +196,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Demo note: In real backend auth, password reset should be done through email OTP or reset link.',
+                      'Backend note: Password reset is connected with the API. If OTP is enabled, enter the OTP sent to your email before resetting.',
                       style: TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 12,
@@ -337,11 +346,11 @@ class _AuthHeroPanel extends StatelessWidget {
             children: [
               _HeroBadge(
                 icon: Icons.lock_outline,
-                label: 'Private Data',
+                label: 'JWT Security',
               ),
               _HeroBadge(
                 icon: Icons.insights_outlined,
-                label: 'Smart Reports',
+                label: 'SQL Server API',
               ),
               _HeroBadge(
                 icon: Icons.devices_outlined,
@@ -403,7 +412,7 @@ class _FreshDataNotice extends StatelessWidget {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'New registered users will start with their own fresh finance data.',
+              'Secure backend authentication is active with JWT session support.',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
@@ -501,8 +510,8 @@ class _AuthFormPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             isLogin
-                ? 'Login to continue managing your home finances.'
-                : 'Register to start your own fresh Budget Home workspace.',
+                ? 'Login securely with backend authentication and JWT session.'
+                : 'Create your secure backend account for Budget Home.',
             style: const TextStyle(
               color: Color(0xFF64748B),
               fontWeight: FontWeight.w600,
@@ -629,7 +638,7 @@ class _AuthFormPanel extends StatelessWidget {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'This is local demo auth. Backend authentication can be connected later.',
+                    'Secure backend authentication is active. Your session is protected with server-side login and JWT token storage.',
                     style: TextStyle(
                       color: Color(0xFF1E3A8A),
                       fontWeight: FontWeight.w700,

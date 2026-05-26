@@ -148,6 +148,86 @@ class FinanceProvider extends ChangeNotifier {
     await _saveAll();
   }
 
+  Future<void> loadExpensesFromApi() async {
+    final response = await _apiRequest(
+      method: 'GET',
+      path: '/expenses',
+    );
+
+    final items = _extractList(response);
+
+    if (items.isEmpty && response == null) return;
+
+    expenses
+      ..clear()
+      ..addAll(items.map((item) => ExpenseRecord.fromJson(item)));
+
+    notifyListeners();
+    await _saveAll();
+  }
+
+  Future<void> loadBillsFromApi() async {
+    final response = await _apiRequest(
+      method: 'GET',
+      path: '/bills',
+    );
+
+    final items = _extractList(response);
+
+    if (items.isEmpty && response == null) return;
+
+    bills
+      ..clear()
+      ..addAll(items.map((item) => BillRecord.fromJson(item)));
+
+    notifyListeners();
+    await _saveAll();
+  }
+
+  Future<void> loadRentsFromApi() async {
+    final response = await _apiRequest(
+      method: 'GET',
+      path: '/rents',
+    );
+
+    final items = _extractList(response);
+
+    if (items.isEmpty && response == null) return;
+
+    rents
+      ..clear()
+      ..addAll(items.map((item) => RentRecord.fromJson(item)));
+
+    notifyListeners();
+    await _saveAll();
+  }
+
+  Future<void> loadLoansFromApi() async {
+    final response = await _apiRequest(
+      method: 'GET',
+      path: '/loans',
+    );
+
+    final items = _extractList(response);
+
+    if (items.isEmpty && response == null) return;
+
+    loans
+      ..clear()
+      ..addAll(items.map((item) => LoanRecord.fromJson(item)));
+
+    notifyListeners();
+    await _saveAll();
+  }
+
+  Future<void> loadAllRecordsFromApi() async {
+    await loadIncomeFromApi();
+    await loadExpensesFromApi();
+    await loadBillsFromApi();
+    await loadRentsFromApi();
+    await loadLoansFromApi();
+  }
+
   void setUserId(String? userId) {
     if (_currentUserId == userId) return;
 
@@ -260,7 +340,8 @@ class FinanceProvider extends ChangeNotifier {
         _clearMemoryOnly();
         await _saveAll();
         notifyListeners();
-        await loadIncomeFromApi();
+        await loadAllRecordsFromApi();
+        await loadExpensesFromApi();
         return;
       }
 
@@ -331,28 +412,72 @@ class FinanceProvider extends ChangeNotifier {
     }
   }
 
-  void addExpense(ExpenseRecord record) {
+  Future<void> addExpense(ExpenseRecord record) async {
     expenses.insert(0, record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    final response = await _apiRequest(
+      method: 'POST',
+      path: '/expenses',
+      body: record.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    final savedRecord = ExpenseRecord.fromJson(savedMap);
+    final index = expenses.indexOf(record);
+
+    if (index != -1) {
+      expenses[index] = savedRecord;
+      notifyListeners();
+      await _saveAll();
+    }
   }
 
-  void updateExpense({
+  Future<void> updateExpense({
     required ExpenseRecord oldRecord,
     required ExpenseRecord newRecord,
-  }) {
+  }) async {
     final index = expenses.indexOf(oldRecord);
     if (index == -1) return;
 
-    expenses[index] = newRecord;
+    final recordToSave = newRecord.copyWith(id: oldRecord.id);
+
+    expenses[index] = recordToSave;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (oldRecord.id == null || oldRecord.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PUT',
+      path: '/expenses/${oldRecord.id}',
+      body: recordToSave.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    expenses[index] = ExpenseRecord.fromJson(savedMap);
+    notifyListeners();
+    await _saveAll();
   }
 
-  void deleteExpense(ExpenseRecord record) {
+  Future<void> deleteExpense(ExpenseRecord record) async {
     expenses.remove(record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    await _apiRequest(
+      method: 'DELETE',
+      path: '/expenses/${record.id}',
+    );
   }
 
   Future<void> addIncome(IncomeRecord record) async {
@@ -423,95 +548,281 @@ class FinanceProvider extends ChangeNotifier {
     );
   }
 
-  void addBill(BillRecord record) {
+  Future<void> addBill(BillRecord record) async {
     bills.insert(0, record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    final response = await _apiRequest(
+      method: 'POST',
+      path: '/bills',
+      body: record.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    final savedRecord = BillRecord.fromJson(savedMap);
+    final index = bills.indexOf(record);
+
+    if (index != -1) {
+      bills[index] = savedRecord;
+      notifyListeners();
+      await _saveAll();
+    }
   }
 
-  void updateBill({
+  Future<void> updateBill({
     required BillRecord oldRecord,
     required BillRecord newRecord,
-  }) {
+  }) async {
     final index = bills.indexOf(oldRecord);
     if (index == -1) return;
 
-    bills[index] = newRecord;
+    final recordToSave = newRecord.copyWith(id: oldRecord.id);
+
+    bills[index] = recordToSave;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (oldRecord.id == null || oldRecord.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PUT',
+      path: '/bills/${oldRecord.id}',
+      body: recordToSave.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    bills[index] = BillRecord.fromJson(savedMap);
+    notifyListeners();
+    await _saveAll();
   }
 
-  void deleteBill(BillRecord record) {
+  Future<void> deleteBill(BillRecord record) async {
     bills.remove(record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    await _apiRequest(
+      method: 'DELETE',
+      path: '/bills/${record.id}',
+    );
   }
 
-  void toggleBillPaid(BillRecord record) {
+  Future<void> toggleBillPaid(BillRecord record) async {
     record.isPaid = !record.isPaid;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PATCH',
+      path: '/bills/${record.id}/toggle-paid',
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap != null) {
+      final index = bills.indexWhere((item) => item.id == record.id);
+      if (index != -1) {
+        bills[index] = BillRecord.fromJson(savedMap);
+        notifyListeners();
+        await _saveAll();
+      }
+    }
   }
 
-  void addRent(RentRecord record) {
+  Future<void> addRent(RentRecord record) async {
     rents.insert(0, record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    final response = await _apiRequest(
+      method: 'POST',
+      path: '/rents',
+      body: record.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    final savedRecord = RentRecord.fromJson(savedMap);
+    final index = rents.indexOf(record);
+
+    if (index != -1) {
+      rents[index] = savedRecord;
+      notifyListeners();
+      await _saveAll();
+    }
   }
 
-  void updateRent({
+  Future<void> updateRent({
     required RentRecord oldRecord,
     required RentRecord newRecord,
-  }) {
+  }) async {
     final index = rents.indexOf(oldRecord);
     if (index == -1) return;
 
-    rents[index] = newRecord;
+    final recordToSave = newRecord.copyWith(id: oldRecord.id);
+
+    rents[index] = recordToSave;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (oldRecord.id == null || oldRecord.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PUT',
+      path: '/rents/${oldRecord.id}',
+      body: recordToSave.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    rents[index] = RentRecord.fromJson(savedMap);
+    notifyListeners();
+    await _saveAll();
   }
 
-  void deleteRent(RentRecord record) {
+  Future<void> deleteRent(RentRecord record) async {
     rents.remove(record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    await _apiRequest(
+      method: 'DELETE',
+      path: '/rents/${record.id}',
+    );
   }
 
-  void toggleRentStatus(RentRecord record) {
+  Future<void> toggleRentStatus(RentRecord record) async {
     record.isPaid = !record.isPaid;
     record.paymentDate = record.isPaid ? 'Today' : '';
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PATCH',
+      path: '/rents/${record.id}/toggle-status',
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap != null) {
+      final index = rents.indexWhere((item) => item.id == record.id);
+      if (index != -1) {
+        rents[index] = RentRecord.fromJson(savedMap);
+        notifyListeners();
+        await _saveAll();
+      }
+    }
   }
 
-  void addLoan(LoanRecord record) {
+  Future<void> addLoan(LoanRecord record) async {
     loans.insert(0, record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    final response = await _apiRequest(
+      method: 'POST',
+      path: '/loans',
+      body: record.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    final savedRecord = LoanRecord.fromJson(savedMap);
+    final index = loans.indexOf(record);
+
+    if (index != -1) {
+      loans[index] = savedRecord;
+      notifyListeners();
+      await _saveAll();
+    }
   }
 
-  void updateLoan({
+  Future<void> updateLoan({
     required LoanRecord oldRecord,
     required LoanRecord newRecord,
-  }) {
+  }) async {
     final index = loans.indexOf(oldRecord);
     if (index == -1) return;
 
-    loans[index] = newRecord;
+    final recordToSave = newRecord.copyWith(id: oldRecord.id);
+
+    loans[index] = recordToSave;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (oldRecord.id == null || oldRecord.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PUT',
+      path: '/loans/${oldRecord.id}',
+      body: recordToSave.toApiJson(),
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap == null) return;
+
+    loans[index] = LoanRecord.fromJson(savedMap);
+    notifyListeners();
+    await _saveAll();
   }
 
-  void deleteLoan(LoanRecord record) {
+  Future<void> deleteLoan(LoanRecord record) async {
     loans.remove(record);
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    await _apiRequest(
+      method: 'DELETE',
+      path: '/loans/${record.id}',
+    );
   }
 
-  void toggleLoanStatus(LoanRecord record) {
+  Future<void> toggleLoanStatus(LoanRecord record) async {
     record.isPaid = !record.isPaid;
     notifyListeners();
-    _saveAll();
+    await _saveAll();
+
+    if (record.id == null || record.id!.isEmpty) return;
+
+    final response = await _apiRequest(
+      method: 'PATCH',
+      path: '/loans/${record.id}/toggle-status',
+    );
+
+    final savedMap = _extractMap(response);
+
+    if (savedMap != null) {
+      final index = loans.indexWhere((item) => item.id == record.id);
+      if (index != -1) {
+        loans[index] = LoanRecord.fromJson(savedMap);
+        notifyListeners();
+        await _saveAll();
+      }
+    }
   }
 
   Future<bool> importFinanceDataFromJson(String jsonText) async {
@@ -593,6 +904,7 @@ class FinanceProvider extends ChangeNotifier {
 
 class ExpenseRecord {
   ExpenseRecord({
+    this.id,
     required this.title,
     required this.category,
     required this.amount,
@@ -600,25 +912,61 @@ class ExpenseRecord {
     required this.paymentMethod,
   });
 
+  final String? id;
   final String title;
   final String category;
   final double amount;
   final String date;
   final String paymentMethod;
 
+  ExpenseRecord copyWith({
+    String? id,
+    String? title,
+    String? category,
+    double? amount,
+    String? date,
+    String? paymentMethod,
+  }) {
+    return ExpenseRecord(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+    );
+  }
+
   factory ExpenseRecord.fromJson(dynamic json) {
     final map = Map<String, dynamic>.from(json as Map);
 
     return ExpenseRecord(
-      title: map['title']?.toString() ?? '',
+      id: map['id']?.toString() ?? map['expenseId']?.toString(),
+      title: map['title']?.toString() ?? map['name']?.toString() ?? '',
       category: map['category']?.toString() ?? 'Other',
       amount: double.tryParse(map['amount'].toString()) ?? 0,
-      date: map['date']?.toString() ?? '',
-      paymentMethod: map['paymentMethod']?.toString() ?? 'Cash',
+      date: map['date']?.toString() ??
+          map['expenseDate']?.toString() ??
+          map['createdAt']?.toString() ??
+          '',
+      paymentMethod: map['paymentMethod']?.toString() ??
+          map['method']?.toString() ??
+          'Cash',
     );
   }
 
   Map<String, dynamic> toJson() {
+    return {
+      if (id != null && id!.isNotEmpty) 'id': id,
+      'title': title,
+      'category': category,
+      'amount': amount,
+      'date': date,
+      'paymentMethod': paymentMethod,
+    };
+  }
+
+  Map<String, dynamic> toApiJson() {
     return {
       'title': title,
       'category': category,
@@ -704,6 +1052,7 @@ class IncomeRecord {
 
 class BillRecord {
   BillRecord({
+    this.id,
     required this.title,
     required this.category,
     required this.amount,
@@ -711,6 +1060,7 @@ class BillRecord {
     required this.isPaid,
   });
 
+  final String? id;
   final String title;
   final String category;
   final double amount;
@@ -719,20 +1069,42 @@ class BillRecord {
 
   String get status => isPaid ? 'Paid' : 'Unpaid';
 
+  BillRecord copyWith({
+    String? id,
+    String? title,
+    String? category,
+    double? amount,
+    String? dueDate,
+    bool? isPaid,
+  }) {
+    return BillRecord(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      dueDate: dueDate ?? this.dueDate,
+      isPaid: isPaid ?? this.isPaid,
+    );
+  }
+
   factory BillRecord.fromJson(dynamic json) {
     final map = Map<String, dynamic>.from(json as Map);
 
+    final statusText = map['status']?.toString().toLowerCase() ?? '';
+
     return BillRecord(
-      title: map['title']?.toString() ?? '',
+      id: map['id']?.toString() ?? map['billId']?.toString(),
+      title: map['title']?.toString() ?? map['name']?.toString() ?? '',
       category: map['category']?.toString() ?? 'Other',
       amount: double.tryParse(map['amount'].toString()) ?? 0,
-      dueDate: map['dueDate']?.toString() ?? '',
-      isPaid: map['isPaid'] == true,
+      dueDate: map['dueDate']?.toString() ?? map['date']?.toString() ?? '',
+      isPaid: map['isPaid'] == true || statusText == 'paid',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      if (id != null && id!.isNotEmpty) 'id': id,
       'title': title,
       'category': category,
       'amount': amount,
@@ -740,10 +1112,22 @@ class BillRecord {
       'isPaid': isPaid,
     };
   }
+
+  Map<String, dynamic> toApiJson() {
+    return {
+      'title': title,
+      'category': category,
+      'amount': amount,
+      'dueDate': dueDate,
+      'isPaid': isPaid,
+      'status': status,
+    };
+  }
 }
 
 class RentRecord {
   RentRecord({
+    this.id,
     required this.propertyName,
     required this.tenantName,
     required this.amount,
@@ -755,6 +1139,7 @@ class RentRecord {
     required this.notes,
   });
 
+  final String? id;
   final String propertyName;
   final String tenantName;
   final double amount;
@@ -767,17 +1152,46 @@ class RentRecord {
 
   String get status => isPaid ? 'Paid' : 'Unpaid';
 
+  RentRecord copyWith({
+    String? id,
+    String? propertyName,
+    String? tenantName,
+    double? amount,
+    String? month,
+    String? year,
+    String? dueDate,
+    bool? isPaid,
+    String? paymentDate,
+    String? notes,
+  }) {
+    return RentRecord(
+      id: id ?? this.id,
+      propertyName: propertyName ?? this.propertyName,
+      tenantName: tenantName ?? this.tenantName,
+      amount: amount ?? this.amount,
+      month: month ?? this.month,
+      year: year ?? this.year,
+      dueDate: dueDate ?? this.dueDate,
+      isPaid: isPaid ?? this.isPaid,
+      paymentDate: paymentDate ?? this.paymentDate,
+      notes: notes ?? this.notes,
+    );
+  }
+
   factory RentRecord.fromJson(dynamic json) {
     final map = Map<String, dynamic>.from(json as Map);
+    final statusText = map['status']?.toString().toLowerCase() ?? '';
 
     return RentRecord(
-      propertyName: map['propertyName']?.toString() ?? '',
-      tenantName: map['tenantName']?.toString() ?? '',
+      id: map['id']?.toString() ?? map['rentId']?.toString(),
+      propertyName:
+          map['propertyName']?.toString() ?? map['property']?.toString() ?? '',
+      tenantName: map['tenantName']?.toString() ?? map['tenant']?.toString() ?? '',
       amount: double.tryParse(map['amount'].toString()) ?? 0,
       month: map['month']?.toString() ?? 'May',
       year: map['year']?.toString() ?? '2026',
       dueDate: map['dueDate']?.toString() ?? '',
-      isPaid: map['isPaid'] == true,
+      isPaid: map['isPaid'] == true || statusText == 'paid',
       paymentDate: map['paymentDate']?.toString() ?? '',
       notes: map['notes']?.toString() ?? '',
     );
@@ -785,6 +1199,7 @@ class RentRecord {
 
   Map<String, dynamic> toJson() {
     return {
+      if (id != null && id!.isNotEmpty) 'id': id,
       'propertyName': propertyName,
       'tenantName': tenantName,
       'amount': amount,
@@ -796,10 +1211,26 @@ class RentRecord {
       'notes': notes,
     };
   }
+
+  Map<String, dynamic> toApiJson() {
+    return {
+      'propertyName': propertyName,
+      'tenantName': tenantName,
+      'amount': amount,
+      'month': month,
+      'year': year,
+      'dueDate': dueDate,
+      'isPaid': isPaid,
+      'paymentDate': paymentDate,
+      'notes': notes,
+      'status': status,
+    };
+  }
 }
 
 class LoanRecord {
   LoanRecord({
+    this.id,
     required this.personName,
     required this.loanType,
     required this.loanPurpose,
@@ -809,6 +1240,7 @@ class LoanRecord {
     required this.notes,
   });
 
+  final String? id;
   final String personName;
   final String loanType;
   final String loanPurpose;
@@ -819,21 +1251,59 @@ class LoanRecord {
 
   String get status => isPaid ? 'Paid' : 'Pending';
 
+  LoanRecord copyWith({
+    String? id,
+    String? personName,
+    String? loanType,
+    String? loanPurpose,
+    double? amount,
+    String? date,
+    bool? isPaid,
+    String? notes,
+  }) {
+    return LoanRecord(
+      id: id ?? this.id,
+      personName: personName ?? this.personName,
+      loanType: loanType ?? this.loanType,
+      loanPurpose: loanPurpose ?? this.loanPurpose,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      isPaid: isPaid ?? this.isPaid,
+      notes: notes ?? this.notes,
+    );
+  }
+
   factory LoanRecord.fromJson(dynamic json) {
     final map = Map<String, dynamic>.from(json as Map);
+    final statusText = map['status']?.toString().toLowerCase() ?? '';
 
     return LoanRecord(
-      personName: map['personName']?.toString() ?? '',
-      loanType: map['loanType']?.toString() ?? 'Given',
-      loanPurpose: map['loanPurpose']?.toString() ?? 'Personal',
+      id: map['id']?.toString() ?? map['loanId']?.toString(),
+      personName: map['personName']?.toString() ?? map['person']?.toString() ?? '',
+      loanType: map['loanType']?.toString() ?? map['type']?.toString() ?? 'Given',
+      loanPurpose:
+          map['loanPurpose']?.toString() ?? map['purpose']?.toString() ?? 'Personal',
       amount: double.tryParse(map['amount'].toString()) ?? 0,
-      date: map['date']?.toString() ?? '',
-      isPaid: map['isPaid'] == true,
+      date: map['date']?.toString() ?? map['dueDate']?.toString() ?? '',
+      isPaid: map['isPaid'] == true || statusText == 'paid',
       notes: map['notes']?.toString() ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
+    return {
+      if (id != null && id!.isNotEmpty) 'id': id,
+      'personName': personName,
+      'loanType': loanType,
+      'loanPurpose': loanPurpose,
+      'amount': amount,
+      'date': date,
+      'isPaid': isPaid,
+      'notes': notes,
+    };
+  }
+
+  Map<String, dynamic> toApiJson() {
     return {
       'personName': personName,
       'loanType': loanType,
@@ -842,6 +1312,7 @@ class LoanRecord {
       'date': date,
       'isPaid': isPaid,
       'notes': notes,
+      'status': status,
     };
   }
 }

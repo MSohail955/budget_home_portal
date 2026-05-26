@@ -1087,6 +1087,75 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+
+  Future<void> confirmImportJsonText(
+    BuildContext context,
+    String jsonText,
+  ) async {
+    final finance = context.read<FinanceProvider>();
+
+    final existingRecords = finance.expenses.length +
+        finance.incomes.length +
+        finance.bills.length +
+        finance.rents.length +
+        finance.loans.length;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFFFEDD5),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFF97316),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Confirm Import')),
+            ],
+          ),
+          content: Text(
+            existingRecords > 0
+                ? 'This import may replace your existing $existingRecords saved record(s), reminder settings, profile contact, and currency preferences. Please export a backup first if needed. Do you want to continue?'
+                : 'This will import finance records, reminder settings, profile contact, and currency preferences from the selected JSON backup. Do you want to continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                openExportSheet(context);
+              },
+              icon: const Icon(Icons.backup_outlined),
+              label: const Text('Backup First'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await importJsonText(context, jsonText);
+              },
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('Import Now'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> importJsonText(
     BuildContext context,
     String jsonText,
@@ -1203,7 +1272,7 @@ class SettingsScreen extends StatelessWidget {
           return;
         }
 
-        await importJsonText(context, result.toString());
+        await confirmImportJsonText(context, result.toString());
       });
 
       reader.readAsText(file);
@@ -1347,6 +1416,11 @@ class SettingsScreen extends StatelessWidget {
                 subtitle:
                     'Select a JSON backup file or paste exported JSON below.',
               ),
+              const SizedBox(height: 14),
+              const _InfoNotice(
+                text:
+                    'Safety check: before import starts, the app will ask for confirmation because imported data may replace existing records.',
+              ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -1432,14 +1506,14 @@ class SettingsScreen extends StatelessWidget {
                       return;
                     }
 
-                    await importJsonText(context, jsonText);
+                    await confirmImportJsonText(context, jsonText);
                   },
                 ),
               ),
               const SizedBox(height: 10),
               const _InfoNotice(
                 text:
-                    'Import will replace current saved records and restore reminder settings if available.',
+                    'Import can replace current saved records and restore reminder settings if available. Export a backup before importing another JSON file.',
               ),
             ],
           ),
